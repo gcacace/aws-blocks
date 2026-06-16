@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Passkeys Demo · AuthCognito</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 20px; line-height: 1.45; }
+    h1 { margin: 0 0 4px 0; }
+    .sub { color: #666; margin: 0 0 20px 0; font-size: 0.9em; }
+    .section { margin: 24px 0; padding: 18px; border: 1px solid #ddd; border-radius: 8px; }
+    .section h2 { margin-top: 0; }
+    button { padding: 8px 14px; margin: 4px 6px 4px 0; cursor: pointer; }
+    input { padding: 6px 8px; margin: 4px 0; }
+    .result { margin-top: 10px; padding: 8px; background: #f6f6f6; border-radius: 4px; font-size: 0.9em; }
+    .success { color: #1e7e34; }
+    .error { color: #c92a2a; }
+    .hint { color: #555; font-size: 0.85em; margin: 4px 0 12px 0; }
+    code, pre { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 0.85em; }
+    pre { padding: 8px; overflow-x: auto; }
+    .signed-in-only { display: none; }
+    .signed-in .signed-in-only { display: block; }
+    .signed-in .signed-out-hint { display: none; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+    .code-hint { color: #666; font-size: 0.85em; margin-top: 8px; }
+    #last-code-result { font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>AuthCognito · Passkeys</h1>
+  <p class="sub">
+    Manual test app for PR <a href="https://github.com/aws-amplify/private-amplify-backend-staging/pull/708" target="_blank" rel="noopener">#708</a>.
+    Run <code>npm run dev</code> for the in-memory mock or <code>npm run sandbox</code> for a real Cognito pool.
+  </p>
+
+  <div class="section">
+    <h2>Authentication</h2>
+    <p class="hint">
+      <strong>First time:</strong> create an account with username + password,
+      then go to "Manage passkeys" and click "Add a passkey to this device".
+      <strong>Returning visit:</strong> sign out, then click "Sign in with passkey",
+      enter your username, and approve the prompt.
+    </p>
+    <div class="signed-out-hint hint">
+      <em>Tip:</em> Chrome on macOS uses Touch ID / your iCloud Keychain;
+      on Windows it uses Windows Hello. Cross-device QR is also offered
+      automatically by the browser.
+    </div>
+    <div id="auth-status" style="font-weight:bold;margin:8px 0;"></div>
+    <div id="auth-container"></div>
+    <div class="code-hint">
+      Mock-only: sign-up codes appear here (no mailbox).
+      <button id="last-code-btn">Show last code</button>
+      <span id="last-code-result"></span>
+    </div>
+  </div>
+
+  <div class="section signed-in-only">
+    <h2>Who am I</h2>
+    <p class="hint">Hits the protected <code>api.whoAmI</code> route — confirms the session cookie is valid.</p>
+    <button id="whoami-btn">whoAmI</button>
+    <pre id="whoami-result" class="result">(not yet)</pre>
+  </div>
+
+  <div class="section">
+    <h2>What to test</h2>
+    <ul>
+      <li>✅ Sign up + confirm OTP → land signed in (auto-sign-in bridge).</li>
+      <li>✅ "Add a passkey to this device" → browser prompts for biometric / PIN.</li>
+      <li>✅ "Manage passkeys" lists registered credentials with delete buttons.</li>
+      <li>✅ Sign out → "Sign in with passkey" → enter username → approve prompt → signed in without password.</li>
+      <li>✅ Choose "Sign In" instead, leave password blank → first-factor picker shows <code>WEB_AUTHN</code> alongside <code>PASSWORD</code>.</li>
+      <li>❌ Click "Add a passkey" twice with the same authenticator → second one should fail (already registered) or succeed as a new credential, depending on browser.</li>
+    </ul>
+  </div>
+
+  <script type="module" src="/src/index.ts"></script>
+</body>
+</html>

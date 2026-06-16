@@ -1,0 +1,60 @@
+{
+  "name": "@aws-blocks/bb-realtime",
+  "version": "0.1.1",
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "DESIGN.md",
+    "src",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "cdk": {
+        "types": "./dist/index.cdk.d.ts",
+        "default": "./dist/index.cdk.js"
+      },
+      "aws-runtime": "./dist/index.aws.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./mock-middleware": {
+      "types": "./dist/mock-middleware.d.ts",
+      "default": "./dist/mock-middleware.js"
+    },
+    "./aws-middleware": {
+      "types": "./dist/aws-middleware.d.ts",
+      "default": "./dist/aws-middleware.js"
+    },
+    "./ws-server": {
+      "types": "./dist/ws-server.d.ts",
+      "default": "./dist/ws-server.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/generate-version.mjs Realtime",
+    "build": "tsc --build",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "dependencies": {
+    "@aws-blocks/core": "^0.1.1",
+    "@aws-blocks/bb-app-setting": "^0.1.1",
+    "@aws-blocks/bb-distributed-table": "^0.1.1",
+    "@aws-blocks/bb-logger": "^0.1.1",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.1040.0",
+    "@standard-schema/spec": "^1.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "aws-cdk-lib": "^2.257.0",
+    "constructs": "^10.6.0"
+  }
+}

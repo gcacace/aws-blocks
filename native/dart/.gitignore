@@ -1,0 +1,13 @@
+.dart_tool/
+pubspec.lock
+*.iml
+.metadata
+.packages
+build/
+.bb-data/
+.blocks-sandbox/
+node_modules/
+*.backup
+.npmrc
+
+pubspec_overrides.yaml

@@ -1,0 +1,14 @@
+.dart_tool/
+.packages
+pubspec.lock
+*.log
+lib/blocks_client.dart
+*.blocks.dart
+flutter_app/android/
+flutter_app/ios/
+flutter_app/linux/
+flutter_app/macos/
+flutter_app/web/
+flutter_app/windows/
+flutter_app/test/
+flutter_app/build/

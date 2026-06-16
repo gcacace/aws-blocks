@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "outDir": "build-temp",
+    "baseUrl": ".",
+    "paths": {
+      "aws-blocks": ["./aws-blocks/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "aws-blocks/**/*"]
+}

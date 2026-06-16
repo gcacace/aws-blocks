@@ -1,0 +1,35 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+import { DatabaseErrors, wrapError } from '../errors.js';
+
+/** PostgreSQL error code for unique constraint violations. */
+const PG_UNIQUE_VIOLATION = '23505';
+
+/** PostgreSQL error code class for connection exceptions. */
+const PG_CONNECTION_EXCEPTION_CLASS = '08';
+
+/**
+ * Translate a PostgreSQL error to a standardized DatabaseErrors name.
+ * Used by both PGliteEngine and PgClientEngine for consistent error behavior.
+ *
+ * @example
+ * // PostgreSQL error code 23505 → UniqueConstraintViolation
+ * // PostgreSQL error code 08xxx → ConnectionFailed
+ * // All other errors → QueryFailed
+ */
+export function translatePgError(e: unknown, engineName: string): never {
+  if (e instanceof Error) {
+    const code = (e as any).code as string | undefined;
+    if (code === PG_UNIQUE_VIOLATION) {
+      e.name = DatabaseErrors.UniqueConstraintViolation;
+    } else if (code && code.startsWith(PG_CONNECTION_EXCEPTION_CLASS)) {
+      e.name = DatabaseErrors.ConnectionFailed;
+    } else {
+      e.name = DatabaseErrors.QueryFailed;
+    }
+    console.debug(`[${engineName}] ${e.name}`, { code });
+    throw e;
+  }
+  wrapError(e);
+}

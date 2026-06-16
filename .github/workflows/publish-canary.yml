@@ -1,0 +1,81 @@
+name: Publish Canary
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-canary
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  canary:
+    name: Publish Canary
+    runs-on: ubuntu-latest
+    environment: publish
+    env:
+      NODE_OPTIONS: '--test-reporter=spec'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: E2E Test Local
+        run: npm run test:e2e:local
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Publish canary to S3
+        env:
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          CLOUDFRONT_DOMAIN: ${{ vars.CLOUDFRONT_DOMAIN }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$BRANCH_NAME" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+            echo "::error::Branch name contains unsafe characters"
+            exit 1
+          fi
+          npx tsx scripts/publish/publish.ts --canary "$BRANCH_NAME"
+
+      - name: Upload publish manifest
+        uses: actions/upload-artifact@v5
+        with:
+          name: canary-publish-manifest
+          path: publish-manifest.json
+
+      - name: Summary
+        run: |
+          echo "## Canary Published 🐤" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f publish-manifest.json ]; then
+            echo "**Dist tag:** \`$(jq -r .distTag publish-manifest.json)\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Packages" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.packages[] | "- `\(.name)@\(.version)`"' publish-manifest.json >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Install" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "npm install $(jq -r '.packages[0].name + "@" + .distTag' publish-manifest.json)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Create App" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "npm create @aws-blocks/blocks-app@$(jq -r .distTag publish-manifest.json) -- --template demo" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,0 +1,145 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+/**
+ * Typed error constants for DistributedTable. Use with `isBlocksError()` in catch blocks.
+ *
+ * @example
+ * ```typescript
+ * import { isBlocksError } from '@aws-blocks/core';
+ * import { DistributedTableErrors } from '@aws-blocks/bb-distributed-table';
+ *
+ * try {
+ *   await table.put(item, { ifNotExists: true });
+ * } catch (e: unknown) {
+ *   if (isBlocksError(e, DistributedTableErrors.ConditionalCheckFailed)) {
+ *     // item already exists
+ *   }
+ *   throw e;
+ * }
+ * ```
+ */
+export const DistributedTableErrors = {
+	ConditionalCheckFailed: 'ConditionalCheckFailedException',
+	ValidationFailed: 'ValidationFailedException',
+	/**
+	 * The query or condition shape is invalid and was rejected before reaching
+	 * DynamoDB: a missing `where` clause, a partition key not given as
+	 * `{ equals: value }`, an unknown index, more than one sort-key condition, or
+	 * an empty `ifFieldEquals`. These are all caller bugs — something the caller
+	 * can fix by correcting the call. Catchable via
+	 * `isBlocksError(e, DistributedTableErrors.InvalidQuery)`.
+	 *
+	 * Kept distinct from {@link ItemTooLarge} (a runtime data condition) so a
+	 * customer can tell "my query is wrong" from "this item is too big" by name
+	 * alone rather than string-matching the message.
+	 */
+	InvalidQuery: 'InvalidQueryException',
+	/**
+	 * An item exceeds DynamoDB's 400 KB per-item size limit. Unlike an invalid
+	 * query, this is not necessarily a caller bug — the size of a given item may
+	 * be outside the caller's control — so callers may want to branch on it
+	 * (skip, split, or store a reference instead). Catchable via
+	 * `isBlocksError(e, DistributedTableErrors.ItemTooLarge)`.
+	 *
+	 * The mock checks serialized byte length client-side and throws this directly.
+	 * On AWS, DynamoDB raises a generic `ValidationException` for oversized items;
+	 * the runtime detects the size-specific message and re-maps it to this name so
+	 * both layers are catchable with the same code. Other `ValidationException`
+	 * causes (malformed expressions, type mismatches) propagate as-is.
+	 */
+	ItemTooLarge: 'ItemTooLargeException',
+	/**
+	 * A batch operation could not complete all entries within the retry budget.
+	 * DynamoDB batch APIs return UnprocessedKeys/UnprocessedItems (HTTP 200) under
+	 * sustained throttling; when retries are exhausted we surface this so callers
+	 * can back off and resubmit rather than silently losing writes or mistaking a
+	 * throttled read for a missing item.
+	 *
+	 * The in-memory mock never throttles, so it never produces this error — the
+	 * constant is shared purely so catch-site handling is identical across both.
+	 */
+	BatchIncomplete: 'BatchIncompleteException',
+} as const;
+
+/**
+ * @internal Build an Error whose `name` carries the typed error code (so callers
+ * can match it with `isBlocksError`). Shared by the mock and AWS runtime so both
+ * produce identically shaped errors.
+ */
+export function blocksError(name: string, message: string): Error {
+	const err = new Error(`${name}: ${message}`);
+	err.name = name;
+	return err;
+}
+
+/**
+ * @internal Normalize a sort-key condition before it drives a query. Shared by
+ * the mock and AWS runtime so both treat the same inputs identically:
+ *
+ * - **Zero defined fields** (`undefined`, or a present-but-empty `{}` /
+ *   `{ createdAt: undefined }`) → returns `undefined`, i.e. "no sort-key filter,
+ *   query the whole partition". A present-but-empty object would otherwise
+ *   diverge: the mock's per-item matcher accepts everything (returns the whole
+ *   partition) while the AWS runtime registers `#sk` in `ExpressionAttributeNames`
+ *   with no clause that uses it, which DynamoDB rejects with `ValidationException`.
+ * - **Exactly one defined field** → returns the condition unchanged.
+ * - **More than one defined field** → throws `InvalidQuery`, because DynamoDB allows
+ *   only one sort-key condition per `KeyConditionExpression` (use `between` for ranges).
+ *
+ * @throws {DistributedTableErrors.InvalidQuery} If more than one sort-key field is defined.
+ */
+export function normalizeSortKeyCondition<C extends Record<string, unknown>>(
+	condition: C | undefined,
+): C | undefined {
+	if (!condition) return undefined;
+	const definedKeys = Object.keys(condition).filter(k => condition[k] !== undefined);
+	if (definedKeys.length === 0) return undefined;
+	if (definedKeys.length > 1) {
+		throw blocksError(DistributedTableErrors.InvalidQuery, DistributedTableMessages.multipleSortKeyConditions(definedKeys));
+	}
+	return condition;
+}
+
+/**
+ * @internal Validation messages shared by the mock and AWS runtime. Centralised
+ * here so the two implementations stay byte-for-byte in lockstep — parity tests
+ * assert the same wording against both.
+ */
+export const DistributedTableMessages = {
+	indexNotFound: (index: string | undefined) => `Index '${index}' not found`,
+	whereRequired: (pkField: string) =>
+		`query() requires a 'where' clause with partition key field '${pkField}'`,
+	partitionKeyEqualsRequired: (pkField: string) =>
+		`query() requires '${pkField}: { equals: value }' in the where clause (partition key must be an exact match)`,
+	multipleSortKeyConditions: (conditionKeys: string[]) =>
+		`Only one sort key condition is allowed per query (DynamoDB limitation). ` +
+		`Got: ${conditionKeys.join(', ')}. Use "between" for range queries.`,
+	emptyIfFieldEquals: 'ifFieldEquals must contain at least one field with a non-undefined value',
+	itemTooLarge: (bytes: number) =>
+		`Item size has exceeded the maximum allowed size of 400 KB (got ${bytes} bytes)`,
+	batchIncomplete: (operation: string, remaining: number, attempts: number) =>
+		`${operation} did not complete: ${remaining} entr${remaining === 1 ? 'y' : 'ies'} still unprocessed ` +
+		`after ${attempts} attempts (DynamoDB throttling or response-size limits). Retry with backoff.`,
+} as const;
+
+/**
+ * @internal Re-map DynamoDB's generic `ValidationException` to the intent-revealing
+ * `ItemTooLarge` name when (and only when) it was raised for an oversized item.
+ *
+ * DynamoDB raises a single `ValidationException` for many unrelated conditions, so
+ * we narrow on the size-specific message ("size has exceeded") before re-mapping —
+ * other `ValidationException` causes (malformed expressions, type mismatches) are
+ * left untouched and propagate as-is. This mirrors the mock's client-side size
+ * check so both layers are catchable with `isBlocksError(e, ItemTooLarge)`. The
+ * original DynamoDB error is preserved as `cause` (kept server-side per D-003) so
+ * its stack and requestId remain available for debugging.
+ */
+export function remapItemTooLarge(err: unknown): unknown {
+	if (err instanceof Error && err.name === 'ValidationException' && /size has exceeded/i.test(err.message)) {
+		const remapped = new Error(err.message, { cause: err });
+		remapped.name = DistributedTableErrors.ItemTooLarge;
+		return remapped;
+	}
+	return err;
+}

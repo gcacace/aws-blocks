@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blocks Comprehensive Test App</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Blocks Comprehensive Test App</h1>
+    <p style="color:#666; margin-bottom:16px;">Interactive demo of all Building Blocks. Move mouse to see realtime cursors (open another tab).</p>
+
+    <!-- Realtime -->
+    <div class="section" id="realtime-area" style="position:relative; height:200px; cursor:crosshair; overflow:hidden;">
+      <h2 style="margin-top:0;">Realtime</h2>
+      <p style="font-size:13px; color:#666;">Move mouse here — open another tab to see shared cursors</p>
+      <p id="realtime-status" style="font-size:13px;"></p>
+    </div>
+
+    <!-- KVStore -->
+    <div class="section">
+      <h2 style="margin-top:0;">KVStore</h2>
+      <div class="row">
+        <input id="kv-key" placeholder="key">
+        <input id="kv-value" placeholder="value">
+        <button onclick="kvPut()">Set</button>
+        <button onclick="kvGet()">Get</button>
+        <button onclick="kvDelete()">Delete</button>
+      </div>
+      <div id="kv-result" class="result"></div>
+    </div>
+
+    <!-- DistributedTable -->
+    <div class="section">
+      <h2 style="margin-top:0;">DistributedTable</h2>
+      <div class="row">
+        <input id="dt-pk" placeholder="pk">
+        <input id="dt-sk" placeholder="sk">
+        <input id="dt-data" placeholder="data">
+      </div>
+      <div class="row">
+        <button onclick="dtPut()">Put</button>
+        <button onclick="dtGet()">Get</button>
+        <button onclick="dtQuery()">Query by PK</button>
+        <button onclick="dtList()">List All</button>
+        <button onclick="dtDelete()">Delete</button>
+      </div>
+      <div id="dt-result" class="result"></div>
+    </div>
+
+    <!-- API Context -->
+    <div class="section">
+      <h2 style="margin-top:0;">API Context</h2>
+      <div class="row">
+        <button onclick="echoHeaders()">Echo Headers</button>
+        <button onclick="echoData()">Echo Data</button>
+        <button onclick="testError()">Throw Error</button>
+      </div>
+      <div id="ctx-result" class="result"></div>
+    </div>
+
+    <!-- Auth -->
+    <div class="section">
+      <h2 style="margin-top:0;">Auth (Basic)</h2>
+      <div class="row">
+        <button onclick="authRequired()">Require Auth</button>
+      </div>
+      <div id="auth-result" class="result"></div>
+    </div>
+
+    <!-- AuthOIDC -->
+    <div class="section">
+      <h2 style="margin-top:0;">AuthOIDC (Stub IdP)</h2>
+      <div class="row">
+        <button onclick="oidcSignInGoogle()">Sign in with Google</button>
+        <button onclick="oidcSignInCorporate()">Sign in with Corporate</button>
+        <button onclick="oidcSignOut()">Sign Out</button>
+      </div>
+      <div class="row">
+        <button onclick="oidcGetUser()">Get Current User</button>
+        <button onclick="oidcHandleCallback()">Handle Redirect Callback</button>
+      </div>
+      <div id="oidc-result" class="result"></div>
+    </div>
+
+    <!-- AsyncJob -->
+    <div class="section">
+      <h2 style="margin-top:0;">AsyncJob</h2>
+      <div class="row">
+        <input id="job-key" placeholder="key">
+        <input id="job-value" placeholder="value">
+        <input id="job-delay" placeholder="delay (s)" type="number" style="width:80px">
+        <button onclick="jobSubmit()">Submit</button>
+        <button onclick="jobSubmitDelayed()">Submit Delayed</button>
+        <button onclick="jobGetResult()">Get Result</button>
+      </div>
+      <div class="row">
+        <button onclick="jobSubmitBatch()">Submit Batch (3)</button>
+        <button onclick="jobSubmitTooLarge()">Submit Too Large</button>
+        <button onclick="jobSubmitBatchTooMany()">Batch Too Many (11)</button>
+      </div>
+      <div id="job-result" class="result"></div>
+
+      <h3 style="margin-top:12px;">Schema-Validated Job</h3>
+      <div class="row">
+        <input id="job-to" placeholder="to (email)">
+        <input id="job-subject" placeholder="subject">
+        <input id="job-body" placeholder="body">
+      </div>
+      <div class="row">
+        <button onclick="jobSubmitValidated()">Submit Validated</button>
+        <button onclick="jobSubmitValidatedBatch()">Batch Validated (2)</button>
+        <button onclick="jobSubmitInvalid()">Submit Invalid Email</button>
+      </div>
+      <div id="job-validated-result" class="result"></div>
+    </div>
+    <!-- Agent Chat -->
+    <div class="section">
+      <h2 style="margin-top:0;">Agent Chat</h2>
+      <div style="display:flex; gap:8px;">
+        <div style="width:200px; border-right:1px solid #ddd; padding-right:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="font-size:13px;">Conversations</strong>
+            <button onclick="chatNew()" style="font-size:12px; padding:2px 8px;">+ New</button>
+          </div>
+          <div id="chat-convos" style="font-size:12px; overflow-y:auto; max-height:200px;"></div>
+        </div>
+        <div style="flex:1;">
+          <div id="chat-messages" style="height:200px; overflow-y:auto; border:1px solid #ddd; padding:8px; margin-bottom:8px; font-size:14px;"></div>
+          <div class="row">
+            <input id="chat-input" placeholder="Type a message..." style="flex:1" onkeydown="if(event.key==='Enter')chatSend()">
+            <button onclick="chatSend()">Send</button>
+          </div>
+          <div id="chat-status" style="font-size:12px; color:#666; margin-top:4px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/index.ts"></script>
+</body>
+</html>

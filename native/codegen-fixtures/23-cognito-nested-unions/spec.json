@@ -1,0 +1,893 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "test",
+    "version": "1.0.0"
+  },
+  "methods": [
+    {
+      "name": "api.cognitoConfirmSignIn",
+      "params": [
+        {
+          "name": "session",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "challengeResponse",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "CognitoConfirmSignInResult",
+        "schema": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "isSignedIn": {
+                  "type": "boolean",
+                  "enum": [
+                    false
+                  ]
+                },
+                "nextStep": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_SMS_CODE"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_TOTP_CODE"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_EMAIL_CODE"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_MFA_SELECTION"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "allowedMFATypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "SMS",
+                              "TOTP",
+                              "EMAIL"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "allowedMFATypes"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_MFA_SETUP_SELECTION"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "allowedMFATypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "TOTP",
+                              "EMAIL"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "allowedMFATypes"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_TOTP_SETUP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "sharedSecret": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "sharedSecret"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_EMAIL_SETUP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "requiredAttributes": {
+                          "oneOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_FIRST_FACTOR_SELECTION"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "availableChallenges": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "PASSWORD",
+                              "EMAIL_OTP",
+                              "SMS_OTP",
+                              "WEB_AUTHN"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "availableChallenges"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_PASSWORD"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_FIRST_FACTOR_EMAIL_OTP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_FIRST_FACTOR_SMS_OTP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_WEB_AUTHN"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "credentialRequestOptions": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "credentialRequestOptions"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "RESET_PASSWORD"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_UP"
+                          ]
+                        },
+                        "codeDeliveryDetails": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/CodeDeliveryDetails"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "isSignedIn",
+                "nextStep"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "isSignedIn": {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                "user": {
+                  "$ref": "#/components/schemas/CognitoUser"
+                }
+              },
+              "required": [
+                "isSignedIn",
+                "user"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "api.cognitoSignIn",
+      "params": [
+        {
+          "name": "username",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "password",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "CognitoSignInResult",
+        "schema": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "isSignedIn": {
+                  "type": "boolean",
+                  "enum": [
+                    false
+                  ]
+                },
+                "nextStep": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_SMS_CODE"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_TOTP_CODE"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_EMAIL_CODE"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_MFA_SELECTION"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "allowedMFATypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "SMS",
+                              "TOTP",
+                              "EMAIL"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "allowedMFATypes"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_MFA_SETUP_SELECTION"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "allowedMFATypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "TOTP",
+                              "EMAIL"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "allowedMFATypes"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_TOTP_SETUP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "sharedSecret": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "sharedSecret"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_EMAIL_SETUP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "requiredAttributes": {
+                          "oneOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONTINUE_SIGN_IN_WITH_FIRST_FACTOR_SELECTION"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "availableChallenges": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "PASSWORD",
+                              "EMAIL_OTP",
+                              "SMS_OTP",
+                              "WEB_AUTHN"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "availableChallenges"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_PASSWORD"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_FIRST_FACTOR_EMAIL_OTP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_FIRST_FACTOR_SMS_OTP"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "codeDeliveryDetails": {
+                          "$ref": "#/components/schemas/CodeDeliveryDetails"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "codeDeliveryDetails"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_IN_WITH_WEB_AUTHN"
+                          ]
+                        },
+                        "session": {
+                          "type": "string"
+                        },
+                        "credentialRequestOptions": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "session",
+                        "credentialRequestOptions"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "RESET_PASSWORD"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRM_SIGN_UP"
+                          ]
+                        },
+                        "codeDeliveryDetails": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/CodeDeliveryDetails"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "isSignedIn",
+                "nextStep"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "isSignedIn": {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                "user": {
+                  "$ref": "#/components/schemas/CognitoUser"
+                }
+              },
+              "required": [
+                "isSignedIn",
+                "user"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "CognitoUser": {
+        "type": "object",
+        "properties": {
+          "userSub": {
+            "type": "string"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "userId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userSub",
+          "groups",
+          "attributes",
+          "userId",
+          "username"
+        ]
+      },
+      "CodeDeliveryDetails": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string"
+          },
+          "deliveryMedium": {
+            "type": "string",
+            "enum": [
+              "SMS",
+              "EMAIL",
+              "PHONE_NUMBER"
+            ]
+          },
+          "attributeName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination",
+          "deliveryMedium",
+          "attributeName"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+# Ensure API Extractor reports use LF line endings on all platforms
+packages/*/API.md text eol=lf

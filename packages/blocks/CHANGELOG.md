@@ -1,0 +1,34 @@
+# @aws-blocks/blocks
+
+## 0.1.1
+
+### Patch Changes
+
+- c0558f3: Minor improvements
+- Updated dependencies [270c049]
+- Updated dependencies [c0558f3]
+  - @aws-blocks/core@0.1.1
+  - @aws-blocks/bb-auth-cognito@0.1.1
+  - @aws-blocks/bb-auth-oidc@0.1.1
+  - @aws-blocks/auth-common@0.1.1
+  - @aws-blocks/bb-app-setting@0.1.1
+  - @aws-blocks/bb-distributed-table@0.1.1
+  - @aws-blocks/bb-file-bucket@0.1.1
+  - @aws-blocks/bb-kv-store@0.1.1
+  - @aws-blocks/bb-metrics@0.1.1
+  - @aws-blocks/bb-realtime@0.1.1
+  - @aws-blocks/bb-agent@0.1.1
+  - @aws-blocks/bb-async-job@0.1.1
+  - @aws-blocks/bb-auth-basic@0.1.1
+  - @aws-blocks/bb-cron-job@0.1.1
+  - @aws-blocks/bb-dashboard@0.1.1
+  - @aws-blocks/bb-data@0.1.1
+  - @aws-blocks/bb-distributed-data@0.1.1
+  - @aws-blocks/bb-email-client@0.1.1
+  - @aws-blocks/bb-knowledge-base@0.1.1
+  - @aws-blocks/bb-logger@0.1.1
+  - @aws-blocks/bb-tracer@0.1.1
+
+## 0.1.0
+
+Initial version

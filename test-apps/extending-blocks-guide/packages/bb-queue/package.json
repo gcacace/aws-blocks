@@ -1,0 +1,37 @@
+{
+  "name": "@guide/bb-queue",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "cdk": {
+        "types": "./dist/index.cdk.d.ts",
+        "default": "./dist/index.cdk.js"
+      },
+      "aws-runtime": "./dist/index.aws.js",
+      "types": "./dist/index.mock.d.ts",
+      "default": "./dist/index.mock.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "echo 'No tests (custom BB exercised by parent harness mock + e2e)'"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "@aws-blocks/core": "*",
+    "aws-cdk-lib": "2.257.0",
+    "constructs": "^10.6.0"
+  }
+}

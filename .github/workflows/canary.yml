@@ -1,0 +1,69 @@
+name: Canary
+
+# Scaffolds a fresh app from a locally-published @aws-blocks registry.
+# Tests the full packaging + scaffold + build + e2e path using published
+# artifacts (not workspace links).
+# Not a PR gate. Runs on a daily schedule against the default branch.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 16:00 UTC (default branch only).
+    - cron: '0 16 * * *'
+  pull_request:
+    paths:
+      - '.github/workflows/canary.yml'
+      - 'scripts/canary/**'
+
+concurrency:
+  group: canary-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_OPTIONS: '--test-reporter=spec'
+
+jobs:
+  canary:
+    name: Canary (local mocks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to local registry
+        run: npm run publish:dry-run
+
+      - name: Start local registry
+        run: |
+          npx tsx scripts/publish/serve-local-registry.ts &
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:4873/registry/@aws-blocks/blocks > /dev/null 2>&1; then
+              echo "Registry ready"
+              break
+            fi
+            if [ $i -eq 15 ]; then
+              echo "ERROR: Registry did not start"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Run canary
+        env:
+          BLOCKS_REGISTRY_URL: http://localhost:4873/registry/
+        run: npm run canary -- --template default

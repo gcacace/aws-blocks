@@ -1,0 +1,27 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.getEvent",
+      "params": [
+        { "name": "id", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "result": {
+        "name": "GetEventResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "date": { "type": "string", "format": "date" },
+            "time": { "type": "string", "format": "time" },
+            "url": { "type": "string", "format": "uri" },
+            "email": { "type": "string", "format": "email" }
+          },
+          "required": ["id", "createdAt", "date", "time", "url", "email"]
+        }
+      }
+    }
+  ]
+}

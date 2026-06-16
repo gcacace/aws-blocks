@@ -1,0 +1,8 @@
+node_modules
+.nuxt
+.output
+.blocks-sandbox
+test-results
+playwright-report
+*.log
+server/plugins/_amplify-cache.mjs

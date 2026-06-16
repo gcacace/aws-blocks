@@ -1,0 +1,35 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.doAction",
+      "params": [
+        { "name": "input", "required": true, "schema": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": { "const": "add" },
+                "value": { "type": "number" }
+              },
+              "required": ["type", "value"]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "const": "remove" },
+                "id": { "type": "string" }
+              },
+              "required": ["type", "id"]
+            }
+          ]
+        }}
+      ],
+      "result": {
+        "name": "DoActionResult",
+        "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } }, "required": ["ok"] }
+      }
+    }
+  ]
+}

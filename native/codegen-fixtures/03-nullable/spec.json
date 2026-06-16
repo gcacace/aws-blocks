@@ -1,0 +1,29 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.getProfile",
+      "params": [
+        { "name": "userId", "required": true, "schema": { "type": "string" } }
+      ],
+      "result": {
+        "name": "GetProfileResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "bio": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ]
+            },
+            "age": { "type": "integer" }
+          },
+          "required": ["name"]
+        }
+      }
+    }
+  ]
+}

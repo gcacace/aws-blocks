@@ -1,0 +1,30 @@
+name: Supabase Keep-Alive
+on:
+  schedule:
+    - cron: '0 0 */3 * *' # Every 3 days
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    environment: publish
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Ping Supabase
+        run: |
+          SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id blocks/supabase-e2e \
+            --query SecretString --output text)
+          PROJECT_REF=$(echo "$SECRET" | jq -r .SUPABASE_PROJECT_REF)
+          ANON_KEY=$(echo "$SECRET" | jq -r .SUPABASE_ANON_KEY)
+          curl -sf "https://${PROJECT_REF}.supabase.co/rest/v1/" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ANON_KEY}" \
+            > /dev/null
+          echo "✓ Supabase project is alive"

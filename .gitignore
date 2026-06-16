@@ -1,0 +1,95 @@
+node_modules
+packages/*/node_modules
+dist
+packages/*/dist
+
+*.tsbuildinfo
+*.swp
+*.DS_Store
+blocks-demo-app/
+blocks-demo-apps/
+demos/
+
+.vscode
+.idea
+.claude
+
+dist-registry/
+
+# Generated client code (hosting apps commit theirs for CI)
+test-apps/comprehensive/aws-blocks/client.js
+test-apps/telemetry/aws-blocks/client.js
+
+# CDK
+cdk.out
+cdk.context.json
+
+# Sandbox deploy artifacts (per-deploy state, account-specific)
+.blocks-sandbox/
+
+# Per-project telemetry/config state (auto-generated, contains UUIDs)
+.blocks/
+# ... except test-apps configs (committed for e2e projectId identification)
+!test-apps/**/.blocks/
+!test-apps/**/.blocks/**
+
+# generated docs artifacts
+docs/tech-design-output
+
+# Local workspace scratch files
+*.local.md
+
+# Building Block local dev data
+.bb-data/
+.bb-data-*/
+
+# Local dev artifacts
+CLAUDE.md
+conversation.md
+**/error_e2e_*.txt
+**/error_hosting.txt
+test-apps/comprehensive/aws-blocks/
+
+# Kiro CLI
+.kiro/
+
+# PR review output
+.bar-raising-pr-reviews/
+
+# Script cache
+.cache/
+**/.bb-data-*/
+
+# Amplify Hosting build output
+test-apps/**/.amplify-hosting/
+
+# Playwright test results
+test-apps/**/test-results/
+# Swift package build artefacts
+.build/
+
+# Auto-generated version files (build-time)
+packages/*/src/version.ts
+
+# RFC drafts (personal working docs)
+docs/tech-design/telemetry-rfc.md
+
+# Manual-test Cognito pool manifest (contains per-deploy AWS resource IDs)
+packages/bb-auth-cognito/scripts/.manual-pools.json
+
+my-test/
+
+# SSR test-app build artefacts (Nuxt/Nitro and Playwright)
+test-apps/**/.nuxt/
+test-apps/**/.output/
+test-apps/**/playwright-report/
+test-apps/**/server/plugins/_amplify-cache.mjs
+
+*.log
+test-apps/telemetry-test/
+
+# API Extractor temp files (working artifacts, not committed)
+packages/*/temp/
+
+# API Extractor intermediate report (generated, only API.md is committed)
+*.api.md

@@ -1,0 +1,6 @@
+[*.{kt,kts}]
+max_line_length=120
+ktlint_code_style=android_studio
+
+# Disabled rules
+ktlint_standard_class-signature = disabled # don't force parameters onto one line in constructors

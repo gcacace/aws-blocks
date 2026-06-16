@@ -1,0 +1,30 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../bb-distributed-table"
+    },
+    {
+      "path": "../bb-realtime"
+    },
+    {
+      "path": "../bb-async-job"
+    },
+    {
+      "path": "../bb-file-bucket"
+    },
+    {
+      "path": "../bb-logger"
+    }
+  ]
+}

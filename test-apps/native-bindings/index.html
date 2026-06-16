@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Native Bindings Test App</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Native Bindings Test App</h1>
+    <p style="color:#666; margin-bottom:16px;">Test backend for native client bindings (Swift, Kotlin, Dart).</p>
+
+    <!-- BasicAuth + Todos -->
+    <div class="section">
+      <h2>Todos (BasicAuth)</h2>
+      <div id="basic-auth-container"></div>
+      <div class="todo-add">
+        <input type="text" id="todo-input" placeholder="New todo..." onkeypress="if(event.key==='Enter') addTodo()">
+        <select id="todo-priority">
+          <option value="1">High</option>
+          <option value="2" selected>Medium</option>
+          <option value="3">Low</option>
+        </select>
+        <button onclick="addTodo()">Add</button>
+      </div>
+      <div class="row">
+        <label style="font-size:13px; color:#888;">Sort:</label>
+        <select onchange="changeSort(this.value)">
+          <option value="none">Todo ID</option>
+          <option value="createdAt">Creation Time</option>
+          <option value="priority">Priority</option>
+        </select>
+      </div>
+      <div id="todo-list"></div>
+      <div id="todo-error" class="result" style="display:none;"></div>
+    </div>
+
+    <!-- CognitoAuth -->
+    <div class="section">
+      <h2>Cognito Auth</h2>
+      <div id="cognito-auth-container"></div>
+    </div>
+
+    <!-- OidcAuth -->
+    <div class="section">
+      <h2>OIDC Auth (Stub IdP)</h2>
+      <div class="row">
+        <button onclick="oidcSignIn('google')">Sign in with Google</button>
+        <button onclick="oidcSignOut()">Sign Out</button>
+      </div>
+      <div class="row">
+        <button onclick="oidcGetUser()">Get Current User</button>
+        <button onclick="oidcHandleCallback()">Handle Redirect Callback</button>
+      </div>
+      <div id="oidc-result" class="result"></div>
+    </div>
+
+    <!-- Realtime Cursors -->
+    <div class="section">
+      <h2>Realtime Cursors</h2>
+      <p style="font-size:13px; color:#666;">Move mouse below — open another tab to see shared cursors</p>
+      <p id="cursor-status" style="font-size:13px; margin-bottom:8px;"></p>
+      <div id="cursor-area" style="position:relative; height:200px; cursor:crosshair; overflow:hidden; background:#f5f5f5; border-radius:4px;"></div>
+    </div>
+
+    <!-- File Storage -->
+    <div class="section">
+      <h2>File Storage</h2>
+      <div class="row">
+        <input type="text" id="file-path" placeholder="Upload path (e.g. images/photo.png)">
+      </div>
+      <div class="row">
+        <input type="file" id="file-input">
+        <button onclick="uploadFile()">Upload</button>
+        <button onclick="downloadFile()">Download</button>
+      </div>
+      <div id="file-result" class="result"></div>
+      <div id="file-preview" style="margin-top: 8px;"></div>
+    </div>
+
+    <!-- KV Store -->
+    <div class="section">
+      <h2>KV Store</h2>
+      <div class="row">
+        <input type="text" id="kv-key" placeholder="key" value="test-key">
+        <input type="text" id="kv-value" placeholder="value" value="test-value">
+        <button onclick="testKvSet()">Set</button>
+        <button onclick="testKvGet()">Get</button>
+        <button onclick="testKvDelete()">Delete</button>
+      </div>
+      <div id="kv-result" class="result"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/index.ts"></script>
+</body>
+</html>

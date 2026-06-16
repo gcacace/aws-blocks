@@ -1,0 +1,114 @@
+import Foundation
+
+
+public enum AuthActionMethod: String, Codable {
+    case get = "GET"
+    case post = "POST"
+}
+
+public struct AuthAction: Codable {
+    public let fields: [AuthField]
+    public let label: String
+    public let method: AuthActionMethod?
+    public let name: String
+    public let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case fields
+        case label
+        case method
+        case name
+        case url
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(self.fields, forKey: .fields)
+        try c.encode(self.label, forKey: .label)
+        try c.encodeIfPresent(self.method, forKey: .method)
+        try c.encode(self.name, forKey: .name)
+        try c.encodeIfPresent(self.url, forKey: .url)
+    }
+}
+
+public enum AuthFieldType: String, Codable {
+    case number
+    case email
+    case text
+    case password
+    case tel
+    case hidden
+}
+
+public struct AuthField: Codable {
+    public let defaultValue: String?
+    public let label: String
+    public let name: String
+    public let required: Bool
+    public let `type`: AuthFieldType
+
+    enum CodingKeys: String, CodingKey {
+        case defaultValue
+        case label
+        case name
+        case required
+        case `type` = "type"
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(self.defaultValue, forKey: .defaultValue)
+        try c.encode(self.label, forKey: .label)
+        try c.encode(self.name, forKey: .name)
+        try c.encode(self.required, forKey: .required)
+        try c.encode(self.`type`, forKey: .`type`)
+    }
+}
+
+public enum AuthStateState: String, Codable {
+    case signedOut
+    case signedIn
+    case confirmingSignUp
+    case confirmingSignIn
+    case confirmingMfa
+    case confirmingPasswordReset
+}
+
+public struct AuthState: Codable {
+    public let actions: [AuthAction]
+    public let error: String?
+    public let retriable: Bool?
+    public let state: AuthStateState
+    public let user: AuthUser?
+
+    enum CodingKeys: String, CodingKey {
+        case actions
+        case error
+        case retriable
+        case state
+        case user
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(self.actions, forKey: .actions)
+        try c.encodeIfPresent(self.error, forKey: .error)
+        try c.encodeIfPresent(self.retriable, forKey: .retriable)
+        try c.encode(self.state, forKey: .state)
+        try c.encodeIfPresent(self.user, forKey: .user)
+    }
+}
+
+public struct AuthUser: Codable {
+    public let userId: String
+    public let username: String
+}
+
+public struct Todo: Codable {
+    public let completed: Bool
+    public let createdAt: Double
+    public let priority: Double
+    public let title: String
+    public let todoId: String
+    public let userId: String
+}

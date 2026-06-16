@@ -1,0 +1,124 @@
+name: Bug Report
+description: Create a report to help us improve AWS Blocks
+labels: ["bug", "pending-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+  - type: checkboxes
+    attributes:
+      label: Before opening, please confirm
+      options:
+        - label: I have [searched for duplicate or closed issues](https://github.com/aws-amplify/aws-blocks/issues?q=is%3Aissue).
+          required: true
+        - label: I have done my best to include a minimal, self-contained set of instructions for consistently reproducing the issue.
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Which package(s) are affected?
+      description: Select the package(s) related to this issue.
+      multiple: true
+      options:
+        - "@aws-blocks/core"
+        - "@aws-blocks/blocks"
+        - "@aws-blocks/foundations"
+        - "@aws-blocks/create-blocks-app"
+        - "Building Block: auth-cognito"
+        - "Building Block: auth-oidc"
+        - "Building Block: data"
+        - "Building Block: file-bucket"
+        - "Building Block: kv-store"
+        - "Building Block: realtime"
+        - "Building Block: cron-job"
+        - "Building Block: async-job"
+        - "Building Block: email-client"
+        - "Building Block: knowledge-base"
+        - "Building Block: logger"
+        - "Building Block: metrics"
+        - "Building Block: tracer"
+        - "Native Client: Kotlin"
+        - "Native Client: Swift"
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: |
+        How can this bug be reproduced? Please walk us through it step by step.
+        For more complex issues, provide a repository with the smallest sample that reproduces the issue.
+      placeholder: |
+        1. Create a new project with '...'
+        2. Add Building Block '...'
+        3. Run '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: code-snippet
+    attributes:
+      label: Code snippet
+      description: |
+        Please provide a code snippet that reproduces the issue.
+        **Be sure to remove any sensitive data.**
+      render: typescript
+    validations:
+      required: false
+
+  - type: textarea
+    id: log-output
+    attributes:
+      label: Log output
+      description: |
+        Include any relevant error messages or stack traces.
+        **Be sure to remove any sensitive data.**
+      render: plain text
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Please provide the following information:
+      value: |
+        - AWS Blocks version:
+        - Node.js version:
+        - Package manager (npm/yarn/pnpm):
+        - OS:
+        - CDK version (if applicable):
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: |
+        Add any other context, screenshots, or files about the bug here.
+    validations:
+      required: false

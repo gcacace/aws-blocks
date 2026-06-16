@@ -1,0 +1,7 @@
+Release Notes v2.0
+
+Major features include improved search functionality, new dashboard widgets, and enhanced security measures.
+
+Performance improvements reduce page load times by 40% across all endpoints.
+
+Bug fixes address issues with file upload timeouts and incorrect date formatting in reports.

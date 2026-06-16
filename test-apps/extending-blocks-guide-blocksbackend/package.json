@@ -1,0 +1,29 @@
+{
+  "name": "test-extending-blocks-guide-blocksbackend",
+  "version": "0.0.0",
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "BlocksBackend brownfield validation harness for the extending-with-existing-aws-resources guide",
+  "scripts": {
+    "synth": "cdk synth --quiet",
+    "deploy": "cdk deploy --require-approval never --outputs-file ./cdk.outputs.json",
+    "destroy": "cdk destroy --force",
+    "test": "echo 'Tests run via test:synth / test:e2e (deploy first)'",
+    "test:synth": "tsx --test test/synth.test.ts",
+    "test:e2e": "tsx --test test/e2e.test.ts"
+  },
+  "dependencies": {
+    "@aws-blocks/blocks": "*",
+    "@aws-blocks/core": "*",
+    "@aws-sdk/client-sqs": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "aws-cdk-lib": "2.257.0",
+    "constructs": "^10.6.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

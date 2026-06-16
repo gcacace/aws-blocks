@@ -1,0 +1,7 @@
+# The following regexes are exceptions for git-secrets - https://github.com/awslabs/git-secrets
+
+# Dummy AWS account numbers used in tests and documentation
+111111111111
+222222222222
+333333333333
+123456789012

@@ -1,0 +1,26 @@
+name: Issue Comment
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+    permissions: {}
+    if: ${{ !github.event.issue.pull_request }}
+    steps:
+      - name: Notify Slack
+        env:
+          WEBHOOK_URL: ${{ secrets.SLACK_COMMENT_WEBHOOK_URL }}
+          BODY: ${{ toJson(github.event.comment.body) }}
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+          ISSUE_TITLE: ${{ toJson(github.event.issue.title) }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          USER: ${{ github.event.comment.user.login }}
+        shell: bash
+        run: |
+          CLEAN_BODY=$(echo $BODY | sed "s/\\\n/. /g; s/\\\r//g; s/[^a-zA-Z0-9 &().,:]//g" | cut -c1-200)
+          CLEAN_TITLE=$(echo $ISSUE_TITLE | sed 's/[^a-zA-Z0-9 &().,:]//g')
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"body\":\"$CLEAN_BODY\", \"commentUrl\":\"$COMMENT_URL\", \"issue\":\"$CLEAN_TITLE\", \"issueNumber\":\"$ISSUE_NUMBER\", \"user\":\"$USER\"}"

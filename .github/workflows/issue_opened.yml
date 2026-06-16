@@ -1,0 +1,23 @@
+name: Issue Opened
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Notify Slack
+        env:
+          WEBHOOK_URL: ${{ secrets.SLACK_ISSUE_WEBHOOK_URL }}
+          ISSUE_TITLE: ${{ toJson(github.event.issue.title) }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          USER: ${{ github.event.issue.user.login }}
+        shell: bash
+        run: |
+          CLEAN_TITLE=$(echo $ISSUE_TITLE | sed 's/[^a-zA-Z0-9 &().,:]//g')
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"issue\":\"$CLEAN_TITLE\", \"issueUrl\":\"$ISSUE_URL\", \"issueNumber\":\"$ISSUE_NUMBER\", \"user\":\"$USER\"}"

@@ -1,0 +1,5 @@
+targets:
+  $default:
+    builders:
+      blocks_codegen|blocks_codegen:
+        enabled: true

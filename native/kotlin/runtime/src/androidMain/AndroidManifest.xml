@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="com.aws.blocks.kotlin.ContextProviderInitializer"
+                android:value="androidx.startup" />
+        </provider>
+
+        <activity
+            android:name="com.aws.blocks.kotlin.oidc.OidcRedirectActivity"
+            android:exported="${oidcActivityExported}"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            tools:ignore="AppLinkUrlError">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${oidcRedirectScheme}" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

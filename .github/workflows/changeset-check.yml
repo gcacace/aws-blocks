@@ -1,0 +1,21 @@
+name: Changeset Check
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Require changeset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - run: npx @changesets/cli status --since=origin/main
+      - name: Verify changeset covers all changed packages
+        run: npx tsx scripts/verify-changeset-coverage.ts

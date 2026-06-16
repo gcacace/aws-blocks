@@ -1,0 +1,47 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.getTodo",
+      "params": [
+        { "name": "id", "required": true, "schema": { "type": "string" } }
+      ],
+      "result": {
+        "name": "GetTodoResult",
+        "schema": { "$ref": "#/components/schemas/Todo" }
+      }
+    },
+    {
+      "name": "api.createTodo",
+      "params": [
+        { "name": "input", "required": true, "schema": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "priority": { "type": "integer" }
+          },
+          "required": ["title", "priority"]
+        }}
+      ],
+      "result": {
+        "name": "CreateTodoResult",
+        "schema": { "$ref": "#/components/schemas/Todo" }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Todo": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "done": { "type": "boolean" },
+          "priority": { "type": "integer" }
+        },
+        "required": ["id", "title", "done", "priority"]
+      }
+    }
+  }
+}

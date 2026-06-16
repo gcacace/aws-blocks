@@ -1,0 +1,23 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.setStatus",
+      "params": [
+        { "name": "status", "required": true, "schema": { "type": "string", "enum": ["active", "inactive", "pending"] } }
+      ],
+      "result": {
+        "name": "SetStatusResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string", "enum": ["active", "inactive", "pending"] },
+            "updatedAt": { "type": "string" }
+          },
+          "required": ["status", "updatedAt"]
+        }
+      }
+    }
+  ]
+}

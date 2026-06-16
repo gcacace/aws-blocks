@@ -1,0 +1,57 @@
+{
+  "name": "@aws-blocks/bb-file-bucket",
+  "version": "0.1.1",
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md",
+    "DESIGN.md",
+    "src",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "browser": "./dist/index.browser.js",
+      "cdk": {
+        "types": "./dist/index.cdk.d.ts",
+        "default": "./dist/index.cdk.js"
+      },
+      "aws-runtime": "./dist/index.aws.js",
+      "types": "./dist/index.mock.d.ts",
+      "default": "./dist/index.mock.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "default": "./dist/middleware.js"
+    },
+    "./mock-middleware": {
+      "types": "./dist/middleware.d.ts",
+      "default": "./dist/middleware.js"
+    },
+    "./file-server": {
+      "types": "./dist/file-server.d.ts",
+      "default": "./dist/file-server.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/generate-version.mjs FileBucket",
+    "build": "tsc --build",
+    "test": "node --test dist/index.test.js dist/index.cdk.test.js dist/scan.test.js dist/file-server.test.js dist/url-encoding.test.js dist/path-containment.test.js dist/bucket-name.test.js"
+  },
+  "dependencies": {
+    "@aws-blocks/bb-logger": "^0.1.1",
+    "@aws-blocks/core": "^0.1.1",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/s3-request-presigner": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "aws-cdk-lib": "^2.257.0",
+    "constructs": "^10.6.0"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.search",
+      "params": [
+        { "name": "query", "required": true, "schema": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "object", "properties": { "text": { "type": "string" }, "fuzzy": { "type": "boolean" } }, "required": ["text"] }
+          ]
+        }}
+      ],
+      "result": {
+        "name": "SearchResult",
+        "schema": { "type": "object", "properties": { "count": { "type": "integer" } }, "required": ["count"] }
+      }
+    },
+    {
+      "name": "api.getValue",
+      "params": [],
+      "result": {
+        "name": "GetValueResult",
+        "schema": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+/**
+ * DSQL-specific error constants.
+ */
+export const DistributedDatabaseErrors = {
+  QueryFailed: 'QueryFailedException',
+  ConnectionFailed: 'ConnectionFailedException',
+  TransactionFailed: 'TransactionFailedException',
+  UniqueConstraintViolation: 'UniqueConstraintViolationException',
+  SerializationFailure: 'SerializationFailureException',
+  TransactionRowLimitExceeded: 'TransactionRowLimitExceededException',
+} as const;
+
+/**
+ * PostgreSQL error codes used for DSQL error translation.
+ * @see https://www.postgresql.org/docs/current/errcodes-appendix.html
+ */
+
+/** Serialization failure — OCC conflict in DSQL. Class 40 (Transaction Rollback). */
+export const PG_SERIALIZATION_FAILURE = '40001';
+/** Unique constraint violation. Class 23 (Integrity Constraint Violation). */
+export const PG_UNIQUE_VIOLATION = '23505';
+/** Connection exception class prefix. Class 08 (Connection Exception). */
+export const PG_CONNECTION_EXCEPTION_CLASS = '08';
+
+/**
+ * Maximum rows mutated per DSQL transaction.
+ * @see https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-transactions.html
+ */
+export const TRANSACTION_ROW_LIMIT = 3000;
+
+/** Translate a pg error code to a DistributedDatabaseErrors name. */
+export function translateDsqlError(e: Error): never {
+  const code = (e as any).code as string | undefined;
+  if (code === PG_SERIALIZATION_FAILURE) {
+    e.name = DistributedDatabaseErrors.SerializationFailure;
+  } else if (code === PG_UNIQUE_VIOLATION) {
+    e.name = DistributedDatabaseErrors.UniqueConstraintViolation;
+  } else if (code && code.startsWith(PG_CONNECTION_EXCEPTION_CLASS)) {
+    e.name = DistributedDatabaseErrors.ConnectionFailed;
+  } else {
+    e.name = DistributedDatabaseErrors.QueryFailed;
+  }
+  throw e;
+}

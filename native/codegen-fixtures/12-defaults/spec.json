@@ -1,0 +1,22 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.createItem",
+      "params": [],
+      "result": {
+        "name": "CreateItemResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "role": { "type": "string", "default": "viewer" },
+            "active": { "type": "boolean", "default": true },
+            "retries": { "type": "integer", "default": 3 }
+          },
+          "required": ["role", "active", "retries"]
+        }
+      }
+    }
+  ]
+}

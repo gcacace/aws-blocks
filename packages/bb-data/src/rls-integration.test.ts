@@ -1,0 +1,127 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+/**
+ * Integration test: RLSEngineWrapper + PGliteEngine.
+ *
+ * Proves that withRLS() correctly sets session variables in a real Postgres
+ * engine (PGlite WASM). This validates the SQL sequence without needing
+ * an external Supabase project.
+ *
+ * Note: PGlite doesn't have Supabase's `auth.uid()` function, so we test
+ * with a simpler RLS policy using `current_setting('request.jwt.claims')`.
+ */
+import { test, afterEach } from 'node:test';
+import assert from 'node:assert';
+import { rmSync } from 'node:fs';
+import { PGliteEngine } from './engines/pglite-engine.js';
+import { RLSEnabledDatabase } from './database.js';
+import { sql } from '@aws-blocks/data-common';
+
+const TEST_DIR = '.bb-data-rls-integration-' + process.pid;
+let engine: PGliteEngine;
+
+afterEach(async () => {
+  if (engine) await engine.destroy().catch(() => {});
+  rmSync(TEST_DIR, { recursive: true, force: true });
+});
+
+async function setup(): Promise<RLSEnabledDatabase> {
+  engine = new PGliteEngine(TEST_DIR);
+
+  // Create the 'authenticated' role that RLS will use
+  await engine.execute(`DO $$ BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+      CREATE ROLE authenticated NOLOGIN;
+    END IF;
+  END $$`);
+
+  // Grant usage to authenticated role
+  await engine.execute(`GRANT USAGE ON SCHEMA public TO authenticated`);
+
+  // Create table with RLS
+  await engine.execute(`CREATE TABLE todos (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    content TEXT NOT NULL
+  )`);
+  await engine.execute(`ALTER TABLE todos ENABLE ROW LEVEL SECURITY`);
+
+  // RLS policy: user can only see rows where user_id matches the JWT sub claim
+  await engine.execute(`CREATE POLICY "users_own_todos" ON todos
+    FOR ALL TO authenticated
+    USING (user_id = (current_setting('request.jwt.claims', true)::json->>'sub'))`);
+
+  // Grant table access to authenticated role
+  await engine.execute(`GRANT SELECT, INSERT, UPDATE, DELETE ON todos TO authenticated`);
+
+  // Seed data (as superuser — bypasses RLS)
+  await engine.execute(`INSERT INTO todos (id, user_id, content) VALUES
+    ('t1', 'user-1', 'User 1 first todo'),
+    ('t2', 'user-1', 'User 1 second todo'),
+    ('t3', 'user-2', 'User 2 todo')`);
+
+  return new RLSEnabledDatabase(engine);
+}
+
+test('integration: withRLS scopes query to user-1 only', async () => {
+  const db = await setup();
+  const scoped = db.withRLS({ userId: 'user-1' });
+  const rows = await scoped.query<{ id: string; user_id: string }>(sql`SELECT * FROM todos ORDER BY id`);
+
+  assert.strictEqual(rows.length, 2);
+  assert.strictEqual(rows[0].id, 't1');
+  assert.strictEqual(rows[1].id, 't2');
+  for (const row of rows) {
+    assert.strictEqual(row.user_id, 'user-1');
+  }
+});
+
+test('integration: withRLS scopes query to user-2 only', async () => {
+  const db = await setup();
+  const scoped = db.withRLS({ userId: 'user-2' });
+  const rows = await scoped.query<{ id: string; user_id: string }>(sql`SELECT * FROM todos`);
+
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].id, 't3');
+  assert.strictEqual(rows[0].user_id, 'user-2');
+});
+
+test('integration: withRLS returns empty for nonexistent user', async () => {
+  const db = await setup();
+  const scoped = db.withRLS({ userId: 'user-999' });
+  const rows = await scoped.query<{ id: string }>(sql`SELECT * FROM todos`);
+
+  assert.deepStrictEqual(rows, []);
+});
+
+test('integration: without withRLS, superuser sees all rows', async () => {
+  const db = await setup();
+  const rows = await db.query<{ id: string }>(sql`SELECT * FROM todos ORDER BY id`);
+
+  assert.strictEqual(rows.length, 3);
+});
+
+test('integration: withRLS execute respects policy (user-1 can only delete own rows)', async () => {
+  const db = await setup();
+  const scoped = db.withRLS({ userId: 'user-1' });
+
+  // Try to delete user-2's row — should affect 0 rows due to RLS
+  const result = await scoped.execute(sql`DELETE FROM todos WHERE id = 't3'`);
+  assert.strictEqual(result.rowCount, 0);
+
+  // Delete own row — should work
+  const result2 = await scoped.execute(sql`DELETE FROM todos WHERE id = 't1'`);
+  assert.strictEqual(result2.rowCount, 1);
+});
+
+test('integration: withRLS transaction maintains context across multiple queries', async () => {
+  const db = await setup();
+
+  // Use explicit transaction via the RLS-scoped database
+  const scoped = db.withRLS({ userId: 'user-1' });
+  await scoped.transaction(async (tx) => {
+    const rows = await tx.query<{ id: string }>(sql`SELECT * FROM todos ORDER BY id`);
+    assert.strictEqual(rows.length, 2); // only user-1's rows
+  });
+});

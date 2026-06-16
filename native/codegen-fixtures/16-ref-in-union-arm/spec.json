@@ -1,0 +1,40 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "test", "version": "1.0.0" },
+  "methods": [
+    {
+      "name": "api.doAction",
+      "params": [
+        { "name": "input", "required": true, "schema": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "action": { "type": "string", "enum": ["signOut"] }
+              },
+              "required": ["action"]
+            },
+            { "$ref": "#/components/schemas/MfaChallenge" }
+          ]
+        }}
+      ],
+      "result": {
+        "name": "DoActionResult",
+        "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } }, "required": ["ok"] }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "MfaChallenge": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["mfa"] },
+          "code": { "type": "string" },
+          "session": { "type": "string" }
+        },
+        "required": ["action", "code", "session"]
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "blocks-backend-app",
+  "version": "0.1.0",
+  "type": "module",
+  "blocksTemplate": "backend",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": ["aws-blocks"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "spec": "blocks-generate-spec",
+    "dev": "tsx watch aws-blocks/scripts/server.ts",
+    "sandbox": "tsx aws-blocks/scripts/sandbox.ts",
+    "sandbox:destroy": "tsx -C cdk aws-blocks/scripts/sandbox-destroy.ts",
+    "sandbox:console": "tsx aws-blocks/scripts/console.ts",
+    "cleanup": "tsx aws-blocks/scripts/cleanup.ts",
+    "deploy": "tsx aws-blocks/scripts/deploy.ts",
+    "destroy": "tsx aws-blocks/scripts/destroy.ts",
+    "test:e2e": "tsx -C browser test/e2e.test.ts",
+    "vendorize": "blocks-vendorize"
+  },
+  "dependencies": {
+    "@aws-blocks/blocks": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "tsx": "^4.7.0",
+    "esbuild": "^0.27.1",
+    "aws-cdk-lib": "2.257.0",
+    "constructs": "^10.6.0"
+  }
+}

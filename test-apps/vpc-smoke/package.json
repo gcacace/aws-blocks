@@ -1,0 +1,15 @@
+{
+  "name": "bb-test-vpc-smoke",
+  "version": "0.1.0",
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin round-trip smoke tests verifying all BBs work in a VPC environment",
+  "scripts": {
+    "test": "echo 'VPC smoke tests run during e2e:sandbox:vpc and e2e:production:vpc'",
+    "test:e2e:local": "echo 'No VPC-dependent BBs on main yet — skipping' && exit 0",
+    "test:e2e:sandbox": "echo 'No VPC-dependent BBs on main yet — skipping' && exit 0",
+    "test:e2e:production": "echo 'No VPC-dependent BBs on main yet — skipping' && exit 0"
+  }
+}

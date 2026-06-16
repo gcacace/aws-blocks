@@ -1,0 +1,149 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+/**
+ * Shared types for KnowledgeBase. Imported by mock, aws, browser, and cdk entry points.
+ * This file has zero runtime dependencies — types only.
+ */
+import type { ChildLogger } from '@aws-blocks/bb-logger';
+
+// ── Source Configuration ────────────────────────────────────────────────────
+
+/**
+ * Defines where the knowledge base sources its documents.
+ *
+ * - `string` (relative path) → folder mode, synced to S3 on deploy.
+ *   Subfolders auto-populate `folder` metadata.
+ * - `string` starting with `s3://` → existing S3 bucket.
+ *
+ * @example
+ * ```typescript
+ * // Local folder — synced to S3 on deploy
+ * const source: SourceConfig = './knowledge';
+ *
+ * // Existing S3 bucket
+ * const source: SourceConfig = 's3://my-docs-bucket';
+ * ```
+ */
+export type SourceConfig = string;
+
+// ── Chunking Configuration ─────────────────────────────────────────────────
+
+/**
+ * Strategy for splitting documents into searchable chunks.
+ *
+ * - `'semantic'` — (Default) Splits at natural topic boundaries using breakpoint detection.
+ * - `'fixed'` — Fixed-size chunks with configurable `chunkSize` and `chunkOverlap`.
+ * - `'hierarchical'` — Two-level chunking (parent 1500 tokens, child 300 tokens).
+ * - `'none'` — No chunking; each document is a single chunk.
+ */
+export type ChunkingStrategy = 'semantic' | 'fixed' | 'hierarchical' | 'none';
+
+/**
+ * Configuration for how documents are split into searchable chunks.
+ * Different strategies expose different tuning knobs — irrelevant options
+ * are silently ignored.
+ */
+export interface ChunkingConfig {
+	/** Chunking strategy. Default: `'semantic'`. */
+	strategy?: ChunkingStrategy;
+	/** Max tokens per chunk. Only used with `'fixed'` strategy. Default: 300. */
+	chunkSize?: number;
+	/** Overlap percentage between consecutive chunks (0–100). Only used with `'fixed'` strategy. Default: 20. */
+	chunkOverlap?: number;
+	/** Breakpoint percentile threshold for topic boundary detection (0–100). Only used with `'semantic'` strategy. Higher values = fewer, larger chunks. Default: 95. */
+	breakpointPercentile?: number;
+}
+
+// ── Constructor Options ────────────────────────────────────────────────────
+
+/**
+ * Constructor options for `KnowledgeBase`.
+ *
+ * @example
+ * ```typescript
+ * const kb = new KnowledgeBase(scope, 'docs', {
+ *   source: './knowledge',
+ *   chunking: { strategy: 'semantic' },
+ *   embeddingDimensions: 1024,
+ *   description: 'Product documentation',
+ * });
+ * ```
+ */
+export interface KnowledgeBaseOptions {
+	/** Document source — local folder path (`'./knowledge'`) or S3 URI (`'s3://bucket/prefix'`). */
+	source: SourceConfig;
+	/** How documents are split into chunks. Default: `{ strategy: 'semantic' }`. */
+	chunking?: ChunkingConfig;
+	/** Embedding model output dimensions. Smaller values reduce cost and storage; larger values improve accuracy. Default: 1024. */
+	embeddingDimensions?: 256 | 512 | 1024;
+	/** Human-readable description for the knowledge base. Shown in the AWS console. */
+	description?: string;
+	/**
+	 * CDK removal behavior for the data bucket (only for BB-created
+	 * buckets; imported S3 URI sources are unaffected). When omitted,
+	 * CDK's default applies (RETAIN — the bucket and its documents are
+	 * preserved on `cdk destroy`).
+	 *
+	 * Pass `'destroy'` for sandbox / ephemeral stacks where the data
+	 * bucket should be dropped on teardown. This also enables
+	 * `autoDeleteObjects` so CloudFormation can empty the bucket before
+	 * deletion. Pass `'retain'` to set the policy explicitly.
+	 *
+	 * Templates that apply `RemovalPolicies.of(stack).destroy()` at the
+	 * top level override this setting.
+	 */
+	removalPolicy?: 'destroy' | 'retain';
+	/** Optional logger for internal operations. When omitted, a default Logger at error level is created. */
+	logger?: ChildLogger;
+}
+
+// ── Retrieve Options & Results ─────────────────────────────────────────────
+
+/**
+ * Tagged-union filter structure for metadata-based retrieval filtering.
+ * All key-value pairs use AND semantics — every condition must match.
+ *
+ * v1 ships with `equals` only. The tagged-union structure makes it easy to add
+ * `contains`, `startsWith`, `notEquals`, `greaterThan` etc. in future without
+ * breaking changes.
+ *
+ * @example
+ * ```typescript
+ * // Single filter
+ * const filter: MetadataFilter = { folder: { equals: 'faq' } };
+ *
+ * // Multiple filters (AND semantics)
+ * const filter: MetadataFilter = {
+ *   folder: { equals: 'products' },
+ *   category: { equals: 'enterprise' },
+ * };
+ * ```
+ */
+export type MetadataFilter = Record<string, { equals: string }>;
+
+/**
+ * Options for the `retrieve()` method.
+ */
+export interface RetrieveOptions {
+	/** Maximum results to return. Clamped to 1–100. Default: 10. */
+	maxResults?: number;
+	/** Metadata filter with AND semantics across all key-value pairs. Only chunks whose metadata matches every condition are returned. */
+	filter?: MetadataFilter;
+}
+
+/**
+ * A single retrieval result representing a matched document chunk.
+ */
+export interface RetrieveResult {
+	/** The text content of the matched chunk. */
+	text: string;
+	/** Relevance score normalized to 0.0–1.0, where 1.0 is a perfect match. */
+	score: number;
+	/** Source document path (relative to source root) or URL. */
+	source: string;
+	/** Document metadata key-value pairs. Includes auto-populated `folder` key derived from subfolder structure. */
+	metadata: Record<string, string>;
+}
+
+

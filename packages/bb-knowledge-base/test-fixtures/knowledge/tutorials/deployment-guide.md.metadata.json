@@ -1,0 +1,16 @@
+{
+  "metadataAttributes": {
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "deployment"
+      }
+    },
+    "difficulty": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "intermediate"
+      }
+    }
+  }
+}

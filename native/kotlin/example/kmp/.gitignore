@@ -1,0 +1,7 @@
+build/
+.gradle/
+.idea/
+local.properties
+gradle/gradle-daemon-jvm.properties
+iosApp/iosApp.xcodeproj/xcuserdata/
+iosApp/iosApp.xcodeproj/project.xcworkspace/xcuserdata/

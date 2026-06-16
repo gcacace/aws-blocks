@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS todos (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  owner_id TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);

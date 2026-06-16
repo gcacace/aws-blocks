@@ -1,0 +1,396 @@
+name: Native SDK E2E
+
+# Mirrors the web E2E pattern (see e2e-amplify-interop.yml): trigger on all PRs,
+# detect whether native SDK / test-backend source changed, run the local suite
+# always-when-relevant, deploy a per-run sandbox to the shared repo account for
+# the sandbox suite (same-repo PRs + manual dispatch only), and expose a single
+# always-running required gate so unrelated/fork PRs don't block branch protection.
+
+on:
+  pull_request:
+    branches: ['*']
+  workflow_dispatch:
+
+concurrency:
+  group: native-e2e-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      source-changed: ${{ steps.check.outputs.source-changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "source-changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only origin/main...HEAD | grep -qE '^(native/(dart|kotlin|swift)|test-apps/native-bindings)/|^\.github/workflows/native-sdk-e2e\.yml$'; then
+            echo "source-changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "source-changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Shared setup: build monorepo, generate spec, upload artifact
+  setup:
+    name: Build & Generate Spec
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.source-changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      spec-path: ${{ steps.spec.outputs.path }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Generate OpenRPC spec
+        id: spec
+        working-directory: test-apps/native-bindings
+        run: |
+          npm run spec
+          echo "path=test-apps/native-bindings/aws-blocks/blocks.spec.json" >> $GITHUB_OUTPUT
+
+      - name: Upload spec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blocks-spec
+          path: test-apps/native-bindings/aws-blocks/blocks.spec.json
+          retention-days: 1
+
+  # Dart E2E (local server) — no AWS, so it runs on fork PRs too
+  dart-e2e:
+    name: Dart E2E
+    needs: [detect-changes, setup]
+    if: needs.detect-changes.outputs.source-changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.11.0'
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Download spec
+        uses: actions/download-artifact@v4
+        with:
+          name: blocks-spec
+          path: test-apps/native-bindings/aws-blocks/
+
+      - name: Start native-bindings server
+        working-directory: test-apps/native-bindings
+        run: |
+          npx tsx aws-blocks/scripts/server.ts &
+          for i in $(seq 1 30); do
+            curl -s -X POST http://localhost:3001/aws-blocks/api \
+              -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","method":"api.kvGet","params":{"key":"healthcheck"},"id":1}' && break
+            sleep 1
+          done
+
+      - name: Run Dart codegen
+        working-directory: native/dart/packages/blocks_codegen
+        run: |
+          # blocks_codegen resolves blocks_runtime via a gitignored
+          # pubspec_overrides.yaml in local dev; recreate it so `dart pub get`
+          # finds the sibling package in CI (blocks_runtime isn't on pub.dev).
+          printf 'dependency_overrides:\n  blocks_runtime:\n    path: ../blocks_runtime\n' > pubspec_overrides.yaml
+          dart pub get
+          dart run bin/blocks_codegen.dart \
+            --spec ../../../../test-apps/native-bindings/aws-blocks/blocks.spec.json \
+            --output ../../example/lib/blocks_client.dart
+
+      - name: Verify generated client compiles
+        working-directory: native/dart/example
+        run: |
+          # Recreate the gitignored path overrides so the example resolves the
+          # in-repo runtime/codegen, and blocks_codegen's hosted blocks_runtime
+          # dep unifies with the path version.
+          printf 'dependency_overrides:\n  blocks_runtime:\n    path: ../packages/blocks_runtime\n  blocks_codegen:\n    path: ../packages/blocks_codegen\n' > pubspec_overrides.yaml
+          dart pub get
+          dart analyze lib/blocks_client.dart
+
+      - name: Run E2E tests
+        working-directory: native/dart/example
+        env:
+          BLOCKS_URL: http://localhost:3001/aws-blocks/api
+        run: dart run bin/e2e_test.dart
+
+  # Kotlin E2E (TODO: add when ready)
+  # kotlin-e2e:
+  #   name: Kotlin E2E
+  #   needs: [detect-changes, setup]
+  #   if: needs.detect-changes.outputs.source-changed == 'true'
+  #   ...
+
+  swift-e2e:
+    name: Swift E2E
+    needs: [detect-changes, setup]
+    if: needs.detect-changes.outputs.source-changed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Download spec
+        uses: actions/download-artifact@v4
+        with:
+          name: blocks-spec
+          path: test-apps/native-bindings/aws-blocks/
+
+      - name: Run Swift codegen
+        working-directory: native/swift
+        run: |
+          swift run swift-code-generator \
+            ../../test-apps/native-bindings/aws-blocks/blocks.spec.json \
+            Tests/BlocksE2ETests/Generated
+
+      - name: Start native-bindings server
+        working-directory: test-apps/native-bindings
+        run: |
+          npx tsx aws-blocks/scripts/server.ts &
+          for i in $(seq 1 30); do
+            curl -s -X POST http://localhost:3001/aws-blocks/api \
+              -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","method":"api.kvGet","params":["healthcheck"],"id":1}' && break
+            sleep 1
+          done
+
+      - name: Run E2E tests
+        env:
+          BLOCKS_URL: http://localhost:3001/aws-blocks/api
+        run: |
+          xcodebuild clean test \
+            -project native/swift/Tests/BlocksE2ETests/BlocksE2ETestApp.xcodeproj \
+            -scheme BlocksE2ETests \
+            -destination 'platform=iOS Simulator,name=iPhone 16'
+
+  # Sandbox E2E — deploys a per-run stack to the shared repo AWS account.
+  # Runs on same-repo PRs (fork PRs can't access secrets/OIDC) and on manual
+  # dispatch. Deploy uses `npm run deploy` (aws-blocks/scripts/deploy.ts ->
+  # aws-blocks/index.cdk.ts); the API serves JSON-RPC under `/aws-blocks/api`.
+  dart-e2e-sandbox:
+    name: Dart E2E (sandbox)
+    needs: [detect-changes, dart-e2e]
+    if: >-
+      needs.detect-changes.outputs.source-changed == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: publish
+    env:
+      BLOCKS_STACK_SUFFIX: native-${{ github.event.pull_request.number || github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.11.0'
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy sandbox
+        working-directory: test-apps/native-bindings
+        run: npm run deploy
+
+      - name: Resolve BLOCKS_URL
+        id: url
+        working-directory: test-apps/native-bindings
+        run: |
+          URL=$(python3 -c "import json; print(json.load(open('.blocks-sandbox/config.json'))['apiUrl'])")
+          echo "blocks_url=${URL}/aws-blocks/api" >> $GITHUB_OUTPUT
+
+      - name: Generate OpenRPC spec
+        working-directory: test-apps/native-bindings
+        run: npm run spec
+
+      - name: Run Dart codegen
+        working-directory: native/dart/packages/blocks_codegen
+        run: |
+          # blocks_codegen resolves blocks_runtime via a gitignored
+          # pubspec_overrides.yaml in local dev; recreate it so `dart pub get`
+          # finds the sibling package in CI (blocks_runtime isn't on pub.dev).
+          printf 'dependency_overrides:\n  blocks_runtime:\n    path: ../blocks_runtime\n' > pubspec_overrides.yaml
+          dart pub get
+          dart run bin/blocks_codegen.dart \
+            --spec ../../../../test-apps/native-bindings/aws-blocks/blocks.spec.json \
+            --output ../../example/lib/blocks_client.dart
+
+      - name: Run Dart E2E against sandbox
+        working-directory: native/dart/example
+        env:
+          BLOCKS_URL: ${{ steps.url.outputs.blocks_url }}
+          # The sandbox is HTTPS, so the OIDC relay suite can run here (the
+          # local-server job above cannot — the stub IdP rejects http
+          # redirect_uris). The server-relay OidcClient landed in #867 (now on
+          # main), so oidc_test.dart compiles.
+          RUN_OIDC: '1'
+        run: |
+          printf 'dependency_overrides:\n  blocks_runtime:\n    path: ../packages/blocks_runtime\n  blocks_codegen:\n    path: ../packages/blocks_codegen\n' > pubspec_overrides.yaml
+          dart pub get
+          dart run bin/e2e_test.dart
+
+      - name: Destroy sandbox
+        if: always()
+        working-directory: test-apps/native-bindings
+        run: npm run destroy || true
+
+  swift-e2e-sandbox:
+    name: Swift E2E (sandbox)
+    needs: [detect-changes, swift-e2e]
+    if: >-
+      needs.detect-changes.outputs.source-changed == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: macos-15
+    timeout-minutes: 30
+    environment: publish
+    env:
+      BLOCKS_STACK_SUFFIX: native-swift-${{ github.event.pull_request.number || github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy sandbox
+        working-directory: test-apps/native-bindings
+        run: npm run deploy
+
+      - name: Resolve BLOCKS_URL
+        id: url
+        working-directory: test-apps/native-bindings
+        run: |
+          URL=$(python3 -c "import json; print(json.load(open('.blocks-sandbox/config.json'))['apiUrl'])")
+          echo "blocks_url=${URL}/aws-blocks/api" >> $GITHUB_OUTPUT
+
+      - name: Generate OpenRPC spec
+        working-directory: test-apps/native-bindings
+        run: npm run spec
+
+      - name: Run Swift codegen
+        working-directory: native/swift
+        run: |
+          swift run swift-code-generator \
+            ../../test-apps/native-bindings/aws-blocks/blocks.spec.json \
+            Tests/BlocksE2ETests/Generated
+
+      - name: Run Swift E2E against sandbox
+        env:
+          BLOCKS_URL: ${{ steps.url.outputs.blocks_url }}
+          RUN_OIDC: '1'
+        run: |
+          xcodebuild test \
+            -project native/swift/Tests/BlocksE2ETests/BlocksE2ETestApp.xcodeproj \
+            -scheme BlocksE2ETests \
+            -destination 'platform=iOS Simulator,name=iPhone 16'
+
+      - name: Destroy sandbox
+        if: always()
+        working-directory: test-apps/native-bindings
+        run: npm run destroy || true
+
+  # Aggregate gate so this can be a single required status check in branch
+  # protection. Always runs (even when the e2e jobs are skipped for unrelated
+  # or fork PRs) and only fails if a job that actually ran failed.
+  native-sdk-e2e-required:
+    name: Native SDK E2E (Required)
+    if: always()
+    needs: [detect-changes, setup, dart-e2e, swift-e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          echo "detect-changes=${{ needs.detect-changes.result }} setup=${{ needs.setup.result }} dart-e2e=${{ needs.dart-e2e.result }} swift-e2e=${{ needs.swift-e2e.result }}"
+          # Required gate = SDK correctness: detect-changes + setup + the local
+          # dart-e2e suite (no AWS). The deploying `dart-e2e-sandbox` job still
+          # runs as a NON-BLOCKING signal — it depends on deployed-backend config
+          # that isn't part of the SDK (real-Cognito email code delivery, which a
+          # dev-only `cognitoGetLastCode` hook can't satisfy; and fresh-deploy
+          # OIDC state). The OIDC relay suite was verified 5/5 against a live
+          # sandbox, so this is environment, not SDK. Re-add `dart-e2e-sandbox`
+          # to this gate once the deployed Cognito sign-in path is testable.
+          # Skipped jobs (no source changes) are treated as passing.
+          for result in \
+            "${{ needs.detect-changes.result }}" \
+            "${{ needs.setup.result }}" \
+            "${{ needs.dart-e2e.result }}" \
+            "${{ needs.swift-e2e.result }}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "A required native SDK E2E job failed (or was cancelled)."
+              exit 1
+            fi
+          done
+          echo "Native SDK E2E (required) checks passed (or were skipped)."

@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../auth-common" },
+    { "path": "../bb-auth-basic" },
+    { "path": "../bb-auth-cognito" },
+    { "path": "../bb-auth-oidc" },
+    { "path": "../bb-kv-store" },
+    { "path": "../bb-distributed-table" },
+    { "path": "../bb-realtime" },
+    { "path": "../bb-data" },
+    { "path": "../bb-distributed-data" },
+    { "path": "../bb-async-job" },
+    { "path": "../bb-agent" },
+    { "path": "../bb-app-setting" },
+    { "path": "../bb-knowledge-base" },
+    { "path": "../bb-cron-job" },
+    { "path": "../bb-file-bucket" },
+    { "path": "../bb-email-client" },
+    { "path": "../bb-metrics" },
+    { "path": "../bb-logger" },
+    { "path": "../bb-tracer" },
+    { "path": "../bb-dashboard" }
+  ]
+}

@@ -1,0 +1,657 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+import { test, describe } from 'node:test';
+import { strict as assert } from 'node:assert';
+import { DistributedTable, DistributedTableErrors } from './index.mock.js';
+import { Scope } from '@aws-blocks/core';
+import { z } from 'zod';
+
+// ── Schemas ─────────────────────────────────────────────────────────────────
+
+const userSchema = z.object({
+	userId: z.string(),
+	email: z.string().email(),
+	name: z.string(),
+	createdAt: z.number(),
+});
+
+const fileSchema = z.object({
+	userId: z.string(),
+	path: z.string(),
+	data: z.string(),
+});
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+let scopeCounter = 0;
+function testScope() {
+	return new Scope(`dt-test-${++scopeCounter}-${Date.now()}`);
+}
+
+async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
+	const items: T[] = [];
+	for await (const item of iter) items.push(item);
+	return items;
+}
+
+// ── Tests ───────────────────────────────────────────────────────────────────
+
+describe('DistributedTable', () => {
+
+	// ── CRUD ────────────────────────────────────────────────────────────────
+
+	describe('CRUD', () => {
+		test('put and get', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			const user = { userId: 'user1', email: 'test@example.com', name: 'Test', createdAt: 1000 };
+			await table.put(user);
+			assert.deepEqual(await table.get({ userId: 'user1', createdAt: 1000 }), user);
+		});
+
+		test('get returns null for missing item', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			assert.equal(await table.get({ userId: 'nope', createdAt: 0 }), null);
+		});
+
+		test('put overwrites existing item', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			const user = { userId: 'user1', email: 'test@example.com', name: 'Original', createdAt: 1000 };
+			await table.put(user);
+			await table.put({ ...user, name: 'Updated' });
+			assert.equal((await table.get({ userId: 'user1', createdAt: 1000 }))?.name, 'Updated');
+		});
+
+		test('delete removes item', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'user1', email: 'test@example.com', name: 'Test', createdAt: 1000 });
+			await table.delete({ userId: 'user1', createdAt: 1000 });
+			assert.equal(await table.get({ userId: 'user1', createdAt: 1000 }), null);
+		});
+
+		test('partition key only (no sort key)', async () => {
+			const schema = z.object({ id: z.string(), value: z.string() });
+			const table = new DistributedTable(testScope(), 'simple', {
+				schema,
+				key: { partitionKey: 'id' },
+			});
+			await table.put({ id: 'item1', value: 'test' });
+			assert.equal((await table.get({ id: 'item1' }))?.value, 'test');
+			await table.delete({ id: 'item1' });
+			assert.equal(await table.get({ id: 'item1' }), null);
+		});
+	});
+
+	// ── Conditional put ─────────────────────────────────────────────────────
+
+	describe('conditional put', () => {
+		test('ifNotExists succeeds on new item', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			const user = { userId: 'user1', email: 'test@example.com', name: 'Test', createdAt: 1000 };
+			await table.put(user, { ifNotExists: true });
+			assert.deepEqual(await table.get({ userId: 'user1', createdAt: 1000 }), user);
+		});
+
+		test('ifNotExists fails on existing item', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			const user = { userId: 'user1', email: 'test@example.com', name: 'Test', createdAt: 1000 };
+			await table.put(user);
+			await assert.rejects(
+				() => table.put(user, { ifNotExists: true }),
+				(err: any) => err.name === DistributedTableErrors.ConditionalCheckFailed,
+			);
+		});
+
+		test('ifFieldEquals succeeds when field matches', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'Test', createdAt: 1000 });
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'Updated', createdAt: 1000 }, { ifFieldEquals: { name: 'Test' } });
+			assert.equal((await table.get({ userId: 'u1', createdAt: 1000 }))?.name, 'Updated');
+		});
+
+		test('ifFieldEquals fails when field does not match', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'Test', createdAt: 1000 });
+			await assert.rejects(
+				() => table.put({ userId: 'u1', email: 'a@b.com', name: 'Fail', createdAt: 1000 }, { ifFieldEquals: { name: 'Wrong' } }),
+				(err: any) => err.name === DistributedTableErrors.ConditionalCheckFailed,
+			);
+		});
+	});
+
+	// ── Conditional delete ──────────────────────────────────────────────────
+
+	describe('conditional delete', () => {
+		test('ifExists succeeds when item exists', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'Test', createdAt: 1000 });
+			await table.delete({ userId: 'u1', createdAt: 1000 }, { ifExists: true });
+			assert.equal(await table.get({ userId: 'u1', createdAt: 1000 }), null);
+		});
+
+		test('ifExists fails when item does not exist', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await assert.rejects(
+				() => table.delete({ userId: 'u1', createdAt: 1000 }, { ifExists: true }),
+				(err: any) => err.name === DistributedTableErrors.ConditionalCheckFailed,
+			);
+		});
+
+		test('ifFieldEquals succeeds when field matches', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'Test', createdAt: 1000 });
+			await table.delete({ userId: 'u1', createdAt: 1000 }, { ifFieldEquals: { name: 'Test' } });
+			assert.equal(await table.get({ userId: 'u1', createdAt: 1000 }), null);
+		});
+
+		test('ifFieldEquals fails when field does not match', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'Test', createdAt: 1000 });
+			await assert.rejects(
+				() => table.delete({ userId: 'u1', createdAt: 1000 }, { ifFieldEquals: { name: 'Wrong' } }),
+				(err: any) => err.name === DistributedTableErrors.ConditionalCheckFailed,
+			);
+		});
+	});
+
+	// ── Schema validation ───────────────────────────────────────────────────
+
+	describe('schema validation', () => {
+		test('rejects invalid item on put', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await assert.rejects(
+				() => table.put({ userId: 'u1', email: 'invalid-email', name: 'Test', createdAt: 1000 } as any),
+				(err: any) => err.name === 'ValidationFailedException',
+			);
+		});
+
+		test('rejects invalid item on putBatch', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await assert.rejects(
+				() => table.putBatch([
+					{ userId: 'u1', email: 'ok@example.com', name: 'Good', createdAt: 1000 },
+					{ userId: 'u2', email: 'bad-email', name: 'Bad', createdAt: 2000 } as any,
+				]),
+				(err: any) => err.name === 'ValidationFailedException',
+			);
+		});
+	});
+
+	// ── Query: numeric sort key ─────────────────────────────────────────────
+
+	describe('query (numeric sort key)', () => {
+		function numTable() {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+				indexes: { byUser: { partitionKey: 'userId', sortKey: 'createdAt' } },
+			});
+			return table;
+		}
+
+		async function seedNumeric(table: ReturnType<typeof numTable>) {
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'A', createdAt: 1000 });
+			await table.put({ userId: 'u1', email: 'b@b.com', name: 'B', createdAt: 2000 });
+			await table.put({ userId: 'u1', email: 'c@b.com', name: 'C', createdAt: 3000 });
+			await table.put({ userId: 'u1', email: 'd@b.com', name: 'D', createdAt: 4000 });
+			await table.put({ userId: 'u1', email: 'e@b.com', name: 'E', createdAt: 5000 });
+		}
+
+		test('no filter — returns all items sorted', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' } } }));
+			assert.equal(items.length, 5);
+			assert.deepEqual(items.map(i => i.createdAt), [1000, 2000, 3000, 4000, 5000]);
+		});
+
+		test('equals', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { equals: 3000 } } }));
+			assert.equal(items.length, 1);
+			assert.equal(items[0].name, 'C');
+		});
+
+		test('greaterThan', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { greaterThan: 3000 } } }));
+			assert.equal(items.length, 2);
+			assert.deepEqual(items.map(i => i.createdAt), [4000, 5000]);
+		});
+
+		test('greaterThanOrEqual', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { greaterThanOrEqual: 3000 } } }));
+			assert.equal(items.length, 3);
+			assert.deepEqual(items.map(i => i.createdAt), [3000, 4000, 5000]);
+		});
+
+		test('lessThan', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { lessThan: 3000 } } }));
+			assert.equal(items.length, 2);
+			assert.deepEqual(items.map(i => i.createdAt), [1000, 2000]);
+		});
+
+		test('lessThanOrEqual', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { lessThanOrEqual: 3000 } } }));
+			assert.equal(items.length, 3);
+			assert.deepEqual(items.map(i => i.createdAt), [1000, 2000, 3000]);
+		});
+
+		test('between (inclusive)', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { between: [2000, 4000] } } }));
+			assert.equal(items.length, 3);
+			assert.deepEqual(items.map(i => i.createdAt), [2000, 3000, 4000]);
+		});
+
+		test('between — single match', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { between: [2500, 3500] } } }));
+			assert.equal(items.length, 1);
+			assert.equal(items[0].createdAt, 3000);
+		});
+
+		test('between — no match', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { between: [5500, 6000] } } }));
+			assert.equal(items.length, 0);
+		});
+
+		test('limit', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' } }, limit: 2 }));
+			assert.equal(items.length, 2);
+			assert.deepEqual(items.map(i => i.createdAt), [1000, 2000]);
+		});
+
+		test('filter + limit combined', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, createdAt: { greaterThan: 1000 } }, limit: 2 }));
+			assert.equal(items.length, 2);
+			assert.deepEqual(items.map(i => i.createdAt), [2000, 3000]);
+		});
+
+		test('partition isolation — different pk returns nothing', async () => {
+			const table = numTable();
+			await seedNumeric(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'other' } } }));
+			assert.equal(items.length, 0);
+		});
+
+		test('nonexistent index throws', async () => {
+			const table = numTable();
+			await assert.rejects(
+				// @ts-expect-error — 'nonexistent' is not a defined index name
+				async () => { for await (const _ of table.query({ index: 'nonexistent', where: { userId: { equals: 'u1' } } })) {} },
+				/Index 'nonexistent' not found/,
+			);
+		});
+
+	});
+
+	// ── Query: string sort key ──────────────────────────────────────────────
+
+	describe('query (string sort key)', () => {
+		function strTable() {
+			return new DistributedTable(testScope(), 'files', {
+				schema: fileSchema,
+				key: { partitionKey: 'userId', sortKey: 'path' },
+				indexes: { byUser: { partitionKey: 'userId', sortKey: 'path' } },
+			});
+		}
+
+		async function seedStrings(table: ReturnType<typeof strTable>) {
+			await table.put({ userId: 'u1', path: '/docs/a.txt', data: 'a' });
+			await table.put({ userId: 'u1', path: '/docs/b.txt', data: 'b' });
+			await table.put({ userId: 'u1', path: '/images/cat.jpg', data: 'c' });
+			await table.put({ userId: 'u1', path: '/images/dog.jpg', data: 'd' });
+			await table.put({ userId: 'u1', path: '/videos/clip.mp4', data: 'e' });
+		}
+
+		test('no filter — returns all sorted lexicographically', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' } } }));
+			assert.equal(items.length, 5);
+			// Lexicographic: /docs/a < /docs/b < /images/cat < /images/dog < /videos/clip
+			assert.deepEqual(items.map(i => i.path), [
+				'/docs/a.txt', '/docs/b.txt', '/images/cat.jpg', '/images/dog.jpg', '/videos/clip.mp4',
+			]);
+		});
+
+		test('equals', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, path: { equals: '/docs/a.txt' } } }));
+			assert.equal(items.length, 1);
+			assert.equal(items[0].data, 'a');
+		});
+
+		test('beginsWith', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, path: { beginsWith: '/docs/' } } }));
+			assert.equal(items.length, 2);
+			assert.ok(items.every(i => i.path.startsWith('/docs/')));
+		});
+
+		test('beginsWith — no match', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, path: { beginsWith: '/music/' } } }));
+			assert.equal(items.length, 0);
+		});
+
+		test('greaterThan (lexicographic)', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, path: { greaterThan: '/images/' } } }));
+			assert.equal(items.length, 3);
+		});
+
+		test('lessThan (lexicographic)', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, path: { lessThan: '/images/' } } }));
+			assert.equal(items.length, 2);
+		});
+
+		test('between (lexicographic, inclusive)', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, path: { between: ['/docs/', '/images/d'] } } }));
+			assert.equal(items.length, 3);
+		});
+
+		test('limit', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' } }, limit: 3 }));
+			assert.equal(items.length, 3);
+		});
+
+		test('beginsWith + limit combined', async () => {
+			const table = strTable();
+			await seedStrings(table);
+			const items = await collect(table.query({ index: 'byUser', where: { userId: { equals: 'u1' }, path: { beginsWith: '/images/' } }, limit: 1 }));
+			assert.equal(items.length, 1);
+			assert.ok(items[0].path.startsWith('/images/'));
+		});
+	});
+
+	// ── Primary key query ───────────────────────────────────────────────────
+
+	describe('query (primary key)', () => {
+		function pkTable() {
+			return new DistributedTable(testScope(), 'pk-query', {
+				schema: fileSchema,
+				key: { partitionKey: 'userId', sortKey: 'path' } as const,
+			});
+		}
+
+		async function seed(table: ReturnType<typeof pkTable>) {
+			await table.put({ userId: 'u1', path: '/docs/a.txt', data: 'a' });
+			await table.put({ userId: 'u1', path: '/docs/b.txt', data: 'b' });
+			await table.put({ userId: 'u1', path: '/images/c.png', data: 'c' });
+			await table.put({ userId: 'u2', path: '/docs/d.txt', data: 'd' });
+		}
+
+		test('returns all items for a partition key', async () => {
+			const table = pkTable();
+			await seed(table);
+			const items = await collect(table.query({ where: { userId: { equals: 'u1' } } }));
+			assert.equal(items.length, 3);
+			for (const item of items) assert.equal(item.userId, 'u1');
+		});
+
+		test('supports sort key conditions', async () => {
+			const table = pkTable();
+			await seed(table);
+			const items = await collect(table.query({ where: { userId: { equals: 'u1' }, path: { beginsWith: '/docs/' } } }));
+			assert.equal(items.length, 2);
+			for (const item of items) assert.ok(item.path.startsWith('/docs/'));
+		});
+
+		test('returns empty for non-existent partition key', async () => {
+			const table = pkTable();
+			await seed(table);
+			const items = await collect(table.query({ where: { userId: { equals: 'nobody' } } }));
+			assert.equal(items.length, 0);
+		});
+
+		test('order desc reverses sort key order', async () => {
+			const table = pkTable();
+			await seed(table);
+			const items = await collect(table.query({ where: { userId: { equals: 'u1' } }, order: 'desc' }));
+			assert.equal(items.length, 3);
+			assert.ok(items[0].path > items[1].path);
+		});
+	});
+
+	// ── Scan ────────────────────────────────────────────────────────────────
+
+	describe('scan', () => {
+		test('returns all items', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'A', createdAt: 1000 });
+			await table.put({ userId: 'u2', email: 'b@b.com', name: 'B', createdAt: 2000 });
+			await table.put({ userId: 'u3', email: 'c@b.com', name: 'C', createdAt: 3000 });
+			assert.equal((await collect(table.scan())).length, 3);
+		});
+
+		test('respects limit', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.put({ userId: 'u1', email: 'a@b.com', name: 'A', createdAt: 1000 });
+			await table.put({ userId: 'u2', email: 'b@b.com', name: 'B', createdAt: 2000 });
+			await table.put({ userId: 'u3', email: 'c@b.com', name: 'C', createdAt: 3000 });
+			assert.equal((await collect(table.scan({ limit: 2 }))).length, 2);
+		});
+
+		test('empty table returns nothing', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			assert.equal((await collect(table.scan())).length, 0);
+		});
+	});
+
+	// ── Batch operations ────────────────────────────────────────────────────
+
+	describe('batch operations', () => {
+		test('putBatch and getBatch', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			const items = [
+				{ userId: 'u1', email: 'a@b.com', name: 'A', createdAt: 1000 },
+				{ userId: 'u2', email: 'b@b.com', name: 'B', createdAt: 2000 },
+				{ userId: 'u3', email: 'c@b.com', name: 'C', createdAt: 3000 },
+			];
+			await table.putBatch(items);
+			const results = await table.getBatch([
+				{ userId: 'u1', createdAt: 1000 },
+				{ userId: 'u2', createdAt: 2000 },
+				{ userId: 'missing', createdAt: 9999 },
+			]);
+			assert.equal(results.length, 3);
+			assert.deepEqual(results[0], items[0]);
+			assert.deepEqual(results[1], items[1]);
+			assert.equal(results[2], null);
+		});
+
+		test('deleteBatch', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await table.putBatch([
+				{ userId: 'u1', email: 'a@b.com', name: 'A', createdAt: 1000 },
+				{ userId: 'u2', email: 'b@b.com', name: 'B', createdAt: 2000 },
+			]);
+			await table.deleteBatch([
+				{ userId: 'u1', createdAt: 1000 },
+				{ userId: 'u2', createdAt: 2000 },
+			]);
+			assert.equal(await table.get({ userId: 'u1', createdAt: 1000 }), null);
+			assert.equal(await table.get({ userId: 'u2', createdAt: 2000 }), null);
+		});
+	});
+
+	// ── Error constants ─────────────────────────────────────────────────────
+
+	describe('error constants', () => {
+		test('DistributedTableErrors has expected values', () => {
+			assert.equal(DistributedTableErrors.ConditionalCheckFailed, 'ConditionalCheckFailedException');
+			assert.equal(DistributedTableErrors.ValidationFailed, 'ValidationFailedException');
+		});
+	});
+
+	// ── TypeScript type safety ──────────────────────────────────────────────
+
+	describe('type safety', () => {
+		test('key config rejects non-existent field names', () => {
+			new DistributedTable(testScope(), 'bad', {
+				schema: userSchema,
+				// @ts-expect-error — 'nonExistent' is not a field in the schema
+				key: { partitionKey: 'nonExistent' },
+			});
+		});
+
+		test('key config rejects non-existent sort key field', () => {
+			new DistributedTable(testScope(), 'bad', {
+				schema: userSchema,
+				// @ts-expect-error — 'badField' is not a field in the schema
+				key: { partitionKey: 'userId', sortKey: 'badField' },
+			});
+		});
+
+		test('index config rejects non-existent field names', () => {
+			new DistributedTable(testScope(), 'bad', {
+				schema: userSchema,
+				key: { partitionKey: 'userId' },
+				// @ts-expect-error — 'fake' is not a field in the schema
+				indexes: { byFake: { partitionKey: 'fake' } },
+			});
+		});
+
+		test('put rejects items missing required fields', () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			// @ts-expect-error — missing 'name' and 'createdAt'
+			const _badItem: Parameters<typeof table.put>[0] = { userId: 'u1', email: 'a@b.com' };
+		});
+
+		test('ifFieldEquals rejects non-schema fields', () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			// @ts-expect-error — 'nonField' is not in the schema
+			const _badOpts: Parameters<typeof table.put>[1] = { ifFieldEquals: { nonField: 'value' } };
+		});
+
+		test('get rejects empty key object', () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			// @ts-expect-error — empty object is missing required key fields
+			const _badKey: Parameters<typeof table.get>[0] = {};
+		});
+
+		test('get rejects key missing sort key', () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			// @ts-expect-error — missing 'createdAt' sort key
+			const _badKey: Parameters<typeof table.get>[0] = { userId: 'u1' };
+		});
+
+		test('delete rejects empty key object', () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			// @ts-expect-error — empty object is missing required key fields
+			const _badKey: Parameters<typeof table.delete>[0] = {};
+		});
+
+		test('query rejects at runtime for nonexistent index', async () => {
+			const table = new DistributedTable(testScope(), 'users', {
+				schema: userSchema,
+				key: { partitionKey: 'userId', sortKey: 'createdAt' },
+			});
+			await assert.rejects(
+				// @ts-expect-error — table has no indexes, testing runtime rejection
+				async () => { for await (const _ of table.query({ index: 'doesNotExist', where: { userId: { equals: 'u1' } } })) {} },
+				/Index 'doesNotExist' not found/,
+			);
+		});
+	});
+});
