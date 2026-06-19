@@ -72,6 +72,72 @@ export interface TraceWidgetProps {
 	height?: number;
 }
 
+// ── PromQL widget (for OTLP metrics; no L2 construct exists) ─────────────────
+
+/**
+ * Custom widget that renders a PromQL query in the CloudWatch Dashboard.
+ *
+ * CloudWatch OTLP metrics are PromQL-queryable (they have no namespace), so they
+ * cannot be shown with the classic metric `GraphWidget`. CloudWatch supports a newer
+ * `"type": "chart"` widget with a `cloudwatch-metrics` / `PromQL` query; CDK has no L2
+ * construct for it, so this extends `ConcreteWidget` to emit the JSON directly.
+ *
+ * @example
+ * ```typescript
+ * new PromqlWidget({ title: 'Requests', query: 'sum({"http.server.requests"})', region: 'us-east-1' });
+ * ```
+ */
+export class PromqlWidget extends ConcreteWidget {
+	private readonly props: PromqlWidgetProps;
+
+	constructor(props: PromqlWidgetProps) {
+		super(props.width ?? 12, props.height ?? 6);
+		this.props = props;
+	}
+
+	toJson(): any[] {
+		return [
+			{
+				type: 'chart',
+				width: this.width,
+				height: this.height,
+				x: this.x ?? 0,
+				y: this.y ?? 0,
+				properties: {
+					title: this.props.title,
+					view: this.props.view ?? 'timeSeries',
+					region: this.props.region,
+					data: {
+						queries: [
+							{
+								id: 'q',
+								type: 'cloudwatch-metrics',
+								language: 'PromQL',
+								query: this.props.query,
+								step: this.props.step ?? 60,
+								label: this.props.title,
+							},
+						],
+					},
+				},
+			},
+		];
+	}
+}
+
+export interface PromqlWidgetProps {
+	title: string;
+	/** The PromQL query string, e.g. `sum({"http.server.requests"})`. */
+	query: string;
+	region: string;
+	/** `'timeSeries'` (default) or `'number'` (single-value). */
+	view?: 'timeSeries' | 'number';
+	/** Resolution step in seconds. @default 60 */
+	step?: number;
+	width?: number;
+	height?: number;
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function blocksError(name: string, message: string): Error {
@@ -257,6 +323,57 @@ export function buildMetricsWidgets(
 	return [[placeholder]];
 }
 
+/**
+ * Build PromQL widgets for OTLP (OpenTelemetry) metrics. Each configured metric gets
+ * a `PromqlWidget` selecting by metric name (OTLP metrics have no namespace). When a
+ * `metricConfig.promql` override is given it is used verbatim; otherwise the default
+ * query is `sum({"<name>"})`, optionally narrowed by `defaultDimensions` as datapoint
+ * label matchers. Widgets are paired into rows of two.
+ */
+export function buildPromqlMetricsWidgets(
+	metricConfigs: MetricConfig[],
+	region: string,
+	defaultDimensions?: Record<string, string>,
+): IWidget[][] {
+	if (metricConfigs.length === 0) {
+		return [[
+			new PromqlWidget({
+				title: 'OTel Metrics',
+				query: 'count({__name__=~".+"})',
+				region,
+				view: 'number',
+				width: 12,
+			}),
+		]];
+	}
+
+	const labelMatchers = defaultDimensions
+		? Object.entries(defaultDimensions).map(([k, v]) => `${k}="${v}"`)
+		: [];
+
+	const widgets: IWidget[] = metricConfigs.map((metric) => {
+		validateMetricConfig(metric);
+		const selector = labelMatchers.length > 0
+			? `{"${metric.name}", ${labelMatchers.join(', ')}}`
+			: `{"${metric.name}"}`;
+		const query = metric.promql ?? `sum(${selector})`;
+		return new PromqlWidget({
+			title: metric.title ?? metric.name,
+			query,
+			region,
+			step: metric.period ?? 60,
+			width: 12,
+			height: 6,
+		});
+	});
+
+	const rows: IWidget[][] = [];
+	for (let i = 0; i < widgets.length; i += 2) {
+		rows.push(widgets.slice(i, i + 2));
+	}
+	return rows;
+}
+
 // ── Logging widgets ─────────────────────────────────────────────────────────
 
 /**
@@ -348,7 +465,12 @@ export function buildDashboardWidgets(config: ResolvedDashboardConfig, functionN
 	// Metrics section
 	if (config.metricsNamespace) {
 		rows.push(sectionHeader('## 📊 Metrics'));
-		rows.push(...buildMetricsWidgets(config.metricsNamespace, config.metricConfigs, region, config.metricsDefaultDimensions));
+		if (config.metricsKind === 'otlp') {
+			// OTLP metrics are PromQL-queryable (no namespace) → PromQL chart widgets.
+			rows.push(...buildPromqlMetricsWidgets(config.metricConfigs, region, config.metricsDefaultDimensions));
+		} else {
+			rows.push(...buildMetricsWidgets(config.metricsNamespace, config.metricConfigs, region, config.metricsDefaultDimensions));
+		}
 	}
 
 	// Tracing section
@@ -399,6 +521,7 @@ export function resolveConfig(id: string, options?: DashboardOptions, functionNa
 		dashboardName: (options?.dashboardName ?? scopeFullId ?? id).replace(/[^A-Za-z0-9\-_]/g, '-').substring(0, 255),
 		metricsNamespace,
 		metricsDefaultDimensions,
+		metricsKind: options?.metrics?.metricsKind ?? 'cloudwatch',
 		logGroupName,
 		tracingEnabled,
 		metricConfigs: options?.metricConfigs ?? [],

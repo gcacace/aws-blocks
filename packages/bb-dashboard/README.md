@@ -29,7 +29,42 @@ const dashboard = new Dashboard(scope, 'dashboard');
 // After deploy: outputs URL to CloudWatch Dashboard with Lambda metrics
 ```
 
-### With Observability BBs (Recommended)
+### With OpenTelemetry blocks (Recommended)
+
+Pass the OpenTelemetry observability blocks — the recommended observability family. With an
+`OtelMetrics` instance the Dashboard renders **PromQL chart widgets**:
+
+```typescript
+import { OtelMetrics } from '@aws-blocks/bb-otel-metrics';
+import { OtelLogger } from '@aws-blocks/bb-otel-logger';
+import { OtelTracer } from '@aws-blocks/bb-otel-tracer';
+
+const logger = new OtelLogger(scope, 'logs');
+const metrics = new OtelMetrics(scope, 'metrics', { namespace: 'MyApp' });
+const tracer = new OtelTracer(scope, 'tracing');
+
+const dashboard = new Dashboard(scope, 'dashboard', {
+  title: 'MyApp — Production',
+  logger,
+  metrics, // metricsKind: 'otlp' is read off the instance → PromQL widgets
+  tracer,
+  metricConfigs: [
+    { name: 'OrdersPlaced' },                                  // → sum({"OrdersPlaced"})
+    { name: 'Latency', promql: 'histogram_quantile(0.99, {"Latency"})', title: 'P99 Latency' },
+  ],
+});
+```
+
+Why OTLP metrics differ: CloudWatch ingests OTLP metrics as **PromQL-queryable** series with
+**no namespace** (they don't appear in classic `ListMetrics`), so they can't be shown with
+the namespace/dimension metric widgets. The Dashboard detects `metricsKind: 'otlp'` on the
+ref and emits `type: "chart"` PromQL widgets that select by metric **name**. Each
+`metricConfig` defaults to `sum({"<name>"})`; supply `promql` for an explicit query (rates,
+quantiles, label filters). `defaultDimensions` become PromQL label matchers.
+
+### With AWS-native observability BBs
+
+Alternatively, pass the AWS-native `Logger` / `Metrics` / `Tracer` blocks (EMF + X-Ray):
 
 ```typescript
 import { Logger } from '@aws-blocks/bb-logger';
@@ -54,9 +89,12 @@ const dashboard = new Dashboard(scope, 'dashboard', {
 ```
 
 The Dashboard extracts configuration directly from BB instances:
-- **Metrics**: uses the BB's resolved `namespace` (which defaults to its scope `fullId` unless overridden) and `defaultDimensions` (automatically included in widget queries so they target the correct dimensioned metric stream)
+- **Metrics**: uses the BB's resolved `namespace` (which defaults to its scope `fullId` unless overridden) and `defaultDimensions` (automatically included in widget queries so they target the correct dimensioned metric stream). `OtelMetrics` instead routes to PromQL chart widgets (see above).
 - **Logger**: enables log widgets; log group derived from Lambda handler function name
 - **Tracer**: presence implies X-Ray tracing is active
+
+Note: `OtelLogger`
+and `OtelTracer` work as the `logger`/`tracer` refs just like the classic blocks.
 
 ## API Reference
 
