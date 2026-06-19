@@ -28,7 +28,14 @@ export class OtelLogger extends AwsOtelLogger {
 	constructor(scope: ScopeParent, id: string, options?: OtelLoggingOptions) {
 		const probe = new Scope(id, { parent: scope });
 		const tracesFile = join(getMockDataDir(probe), 'traces.json');
-		getOrCreateOtelSdk({ serviceName: probe.fullId }, mockExporters(tracesFile));
+		getOrCreateOtelSdk({
+			resource: {
+				serviceName: options?.serviceName,
+				serviceNamespace: options?.serviceNamespace,
+				serviceVersion: options?.serviceVersion,
+			},
+			defaultServiceName: probe.fullId,
+		}, mockExporters(tracesFile));
 		super(scope, id, options);
 	}
 }

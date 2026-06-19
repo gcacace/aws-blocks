@@ -8,7 +8,14 @@ import { logs } from '@opentelemetry/api-logs';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import { InMemoryMetricExporter, AggregationTemporality } from '@opentelemetry/sdk-metrics';
 import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs';
-import { getOrCreateOtelSdk, registerOtelFlusher, flushOtel } from './sdk.js';
+import {
+	getOrCreateOtelSdk,
+	registerOtelFlusher,
+	flushOtel,
+	getOtelMeterProvider,
+	getOtelTracerProvider,
+	getOtelLoggerProvider,
+} from './sdk.js';
 import type { OtelExporters } from './sdk.js';
 
 function inMemoryExporters(): OtelExporters {
@@ -19,18 +26,21 @@ function inMemoryExporters(): OtelExporters {
 	};
 }
 
+const savedEnv = { ...process.env };
+
 afterEach(() => {
 	// Reset process-global SDK + flushers between tests.
 	delete (globalThis as any).__BLOCKS_OTEL_SDK__;
 	delete (globalThis as any).__BLOCKS_OTEL_FLUSHERS__;
+	delete (globalThis as any).__BLOCKS_OTEL_FLUSH__;
+	// Restore env (tests mutate BLOCKS_STACK_NAME / AWS_* for resource detection).
+	for (const k of Object.keys(process.env)) if (!(k in savedEnv)) delete process.env[k];
+	Object.assign(process.env, savedEnv);
 });
 
 describe('getOrCreateOtelSdk', () => {
 	test('wires up a real (non-noop) tracer — spans get valid, non-zero contexts', () => {
-		// trace.getTracerProvider() returns a delegating ProxyTracerProvider by design,
-		// so we assert on behavior: a real registered provider yields valid 32-hex trace
-		// IDs, whereas the unconfigured no-op tracer yields an all-zero invalid context.
-		getOrCreateOtelSdk({ serviceName: 'test-svc' }, inMemoryExporters());
+		getOrCreateOtelSdk({ resource: { serviceName: 'test-svc' } }, inMemoryExporters());
 		const span = trace.getTracer('test').startSpan('probe');
 		const ctx = span.spanContext();
 		span.end();
@@ -39,7 +49,7 @@ describe('getOrCreateOtelSdk', () => {
 	});
 
 	test('registers non-noop meter and logger providers', () => {
-		getOrCreateOtelSdk({ serviceName: 'test-svc' }, inMemoryExporters());
+		getOrCreateOtelSdk({ resource: { serviceName: 'test-svc' } }, inMemoryExporters());
 		const meterName = (metrics.getMeterProvider() as any)?.constructor?.name ?? '';
 		const loggerName = (logs.getLoggerProvider() as any)?.constructor?.name ?? '';
 		assert.doesNotMatch(meterName, /noop/i, `meter provider was ${meterName}`);
@@ -47,18 +57,71 @@ describe('getOrCreateOtelSdk', () => {
 	});
 
 	test('is a singleton — repeated calls return the same instance', () => {
-		const a = getOrCreateOtelSdk({ serviceName: 'test-svc' }, inMemoryExporters());
-		const b = getOrCreateOtelSdk({ serviceName: 'other-svc' }, inMemoryExporters());
+		const a = getOrCreateOtelSdk({ resource: { serviceName: 'test-svc' } }, inMemoryExporters());
+		const b = getOrCreateOtelSdk({ resource: { serviceName: 'other-svc' } }, inMemoryExporters());
 		assert.strictEqual(a, b);
 	});
+});
 
-	test('produces a usable tracer that emits a real span context', () => {
-		getOrCreateOtelSdk({ serviceName: 'test-svc' }, inMemoryExporters());
-		const tracer = trace.getTracer('test');
-		const span = tracer.startSpan('unit');
-		const ctx = span.spanContext();
-		span.end();
-		assert.match(ctx.traceId, /^[0-9a-f]{32}$/);
+// The SDK 2.x MeterProvider stores its Resource privately at `_sharedState.resource`;
+// we read it directly to assert our resource-building logic (a focused unit test of our
+// own wiring, not the SDK's public contract).
+describe('resource (service identity + detection)', () => {
+	test('sets service.name/namespace/version from explicit options', () => {
+		const sdk = getOrCreateOtelSdk({
+			resource: { serviceName: 'orders', serviceNamespace: 'shop', serviceVersion: '1.2.3' },
+		}, inMemoryExporters());
+		const attrs = (sdk.meterProvider as any)._sharedState?.resource?.attributes ?? {};
+		assert.strictEqual(attrs['service.name'], 'orders');
+		assert.strictEqual(attrs['service.namespace'], 'shop');
+		assert.strictEqual(attrs['service.version'], '1.2.3');
+	});
+
+	test('defaults service.name to BLOCKS_STACK_NAME, then defaultServiceName', () => {
+		process.env.BLOCKS_STACK_NAME = 'my-stack';
+		const sdk = getOrCreateOtelSdk({ defaultServiceName: 'fallback-id' }, inMemoryExporters());
+		const attrs = (sdk.meterProvider as any)._sharedState?.resource?.attributes ?? {};
+		assert.strictEqual(attrs['service.name'], 'my-stack');
+	});
+
+	test('falls back to defaultServiceName when BLOCKS_STACK_NAME is unset', () => {
+		delete process.env.BLOCKS_STACK_NAME;
+		const sdk = getOrCreateOtelSdk({ defaultServiceName: 'block-fullid' }, inMemoryExporters());
+		const attrs = (sdk.meterProvider as any)._sharedState?.resource?.attributes ?? {};
+		assert.strictEqual(attrs['service.name'], 'block-fullid');
+	});
+
+	test('merges AWS Lambda detected attributes (faas.*/cloud.*) when in a Lambda env', () => {
+		// Satisfy the awsLambdaDetector guard + the env vars it reads.
+		process.env.AWS_EXECUTION_ENV = 'AWS_Lambda_nodejs20.x';
+		process.env.AWS_REGION = 'us-east-1';
+		process.env.AWS_LAMBDA_FUNCTION_NAME = 'fn-x';
+		process.env.AWS_LAMBDA_FUNCTION_VERSION = '$LATEST';
+		process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '512';
+		const sdk = getOrCreateOtelSdk({ resource: { serviceName: 'orders' } }, inMemoryExporters());
+		const attrs = (sdk.meterProvider as any)._sharedState?.resource?.attributes ?? {};
+		assert.strictEqual(attrs['service.name'], 'orders', 'explicit service.name preserved');
+		assert.strictEqual(attrs['cloud.provider'], 'aws');
+		assert.strictEqual(attrs['cloud.platform'], 'aws_lambda');
+		assert.strictEqual(attrs['faas.name'], 'fn-x');
+	});
+});
+
+describe('provider accessors (library escape hatch)', () => {
+	test('return the initialized SDK providers', () => {
+		const sdk = getOrCreateOtelSdk({ resource: { serviceName: 'test-svc' } }, inMemoryExporters());
+		assert.strictEqual(getOtelMeterProvider(), sdk.meterProvider);
+		assert.strictEqual(getOtelTracerProvider(), sdk.tracerProvider);
+		assert.strictEqual(getOtelLoggerProvider(), sdk.loggerProvider);
+	});
+
+	test('do not throw when no SDK is initialized (fall back to API global)', () => {
+		assert.doesNotThrow(() => getOtelMeterProvider());
+		assert.doesNotThrow(() => getOtelTracerProvider());
+		assert.doesNotThrow(() => getOtelLoggerProvider());
+		// A library can get a correctly-named meter off the returned provider.
+		const meter = getOtelMeterProvider().getMeter('their-lib', '1.0');
+		assert.ok(typeof meter.createCounter === 'function');
 	});
 });
 
@@ -81,7 +144,7 @@ describe('flushOtel', () => {
 	});
 
 	test('getOrCreateOtelSdk auto-registers a flusher', async () => {
-		getOrCreateOtelSdk({ serviceName: 'test-svc' }, inMemoryExporters());
+		getOrCreateOtelSdk({ resource: { serviceName: 'test-svc' } }, inMemoryExporters());
 		const flushers = (globalThis as any).__BLOCKS_OTEL_FLUSHERS__ as Set<unknown>;
 		assert.ok(flushers && flushers.size >= 1);
 		await assert.doesNotReject(flushOtel());

@@ -18,7 +18,11 @@
  * (either explicitly configured or defaulting to the Metrics BB's scope fullId).
  */
 export interface MetricsBBRef {
-	readonly namespace: string;
+	/**
+	 * CloudWatch metric namespace for **classic (EMF) `Metrics`**. OTLP-based `OtelMetrics`
+	 * has no namespace (metrics are PromQL-queryable, selected by name) and omits this.
+	 */
+	readonly namespace?: string;
 	/**
 	 * Default dimensions applied to every metric emitted by the Metrics BB.
 	 * When present, the Dashboard BB merges these into widget queries so that
@@ -207,6 +211,8 @@ export interface DashboardOptions {
 export interface ResolvedDashboardConfig {
 	title: string;
 	dashboardName: string;
+	/** Whether a Metrics ref was provided (renders the metrics section). */
+	metricsEnabled: boolean;
 	metricsNamespace: string | undefined;
 	metricsDefaultDimensions: Record<string, string> | undefined;
 	/** `'otlp'` → render PromQL chart widgets; `'cloudwatch'` (default) → metric GraphWidgets. */

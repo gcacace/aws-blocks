@@ -8,14 +8,13 @@ import type { Counter, Histogram, UpDownCounter, ObservableGauge, Meter, MetricO
 import { getOrCreateOtelSdk } from '@aws-blocks/otel-common';
 import { Logger } from '@aws-blocks/bb-logger';
 import type { ChildLogger } from '@aws-blocks/bb-logger';
-import type { EmitOptions, MetricDatum, MetricUnit, OtelMetricsOptions, OtelMetricsEmitter } from './types.js';
+import type { EmitOptions, MetricUnit, OtelMetricsOptions, OtelMetricsEmitter } from './types.js';
 import { OtelMetricsErrors } from './errors.js';
 
 export { OtelMetricsErrors } from './errors.js';
 export type {
 	OtelMetricsOptions,
 	EmitOptions,
-	MetricDatum,
 	MetricUnit,
 	OtelMetricsEmitter,
 	Counter,
@@ -40,44 +39,24 @@ function validateMetricName(name: string): void {
 	}
 }
 
-/** Normalize a user-facing unit to its OTel/UCUM form. */
-function toOtelUnit(unit?: MetricUnit): string {
-	switch (unit) {
-		case undefined:
-		case 'None':
-		case 'Count':
-		case '1':
-			return '1';
-		case 'Seconds':
-			return 's';
-		case 'Milliseconds':
-			return 'ms';
-		case 'Microseconds':
-			return 'us';
-		case 'Bytes':
-			return 'By';
-		case 'Percent':
-			return '%';
-		default:
-			return unit;
-	}
-}
-
 /**
  * Custom application metrics via OpenTelemetry, exported to Amazon CloudWatch's OTLP
  * endpoint (PromQL-queryable) through the in-process OTel SDK + collector layer.
  *
- * Keeps the ergonomic `emit`/`emitBatch`/`child` surface of the EMF-based `Metrics`
- * block, and additionally exposes OTel's typed instruments (`counter`, `histogram`,
- * `upDownCounter`, `observableGauge`) and the raw `Meter` (`rawMeter`) for full power.
+ * Offers an ergonomic `emit`/`child` surface and additionally exposes OTel's typed
+ * instruments (`counter`, `histogram`, `upDownCounter`, `observableGauge`) and the raw
+ * `Meter` (`rawMeter`) for full power. There is no `emitBatch` — OpenTelemetry batches at
+ * export time (the SDK's periodic reader), so calling `emit` repeatedly is the idiom.
  *
- * **When to use:** vendor-neutral OTel metrics, or when you want OTel's instrument
- * semantics (monotonic counters, histograms, async gauges). For the AWS-native EMF
- * path, use `Metrics`.
+ * Service identity (`service.name`/`service.namespace`/`service.version`) is set on the
+ * SDK resource and is process-wide; the meter (instrumentation scope) name distinguishes
+ * per-block telemetry. AWS Lambda resource attributes (`faas.*`, `cloud.*`) are detected
+ * and attached automatically.
+ *
+ * **When to use:** the default for application metrics. Choose the AWS-native `Metrics`
+ * block only if you specifically need CloudWatch EMF / classic namespace+dimension metrics.
  */
 export class OtelMetrics extends Scope implements OtelMetricsEmitter {
-	/** Instrumentation scope name; surfaced to the Dashboard as the metric namespace. */
-	readonly namespace: string;
 	/**
 	 * Default attributes applied to every metric. Exposed as `defaultDimensions` for
 	 * structural compatibility with the Dashboard's `MetricsBBRef`.
@@ -94,16 +73,22 @@ export class OtelMetrics extends Scope implements OtelMetricsEmitter {
 	constructor(scope: ScopeParent, id: string, options?: OtelMetricsOptions) {
 		super(id, { parent: scope });
 		this.log = options?.logger ?? new Logger(this, 'logger', { level: 'error' });
-		this.namespace = options?.namespace ?? this.fullId;
 		this.defaultDimensions = options?.defaultAttributes ?? {};
-		getOrCreateOtelSdk({ serviceName: this.namespace });
-		this.meter = otelMetrics.getMeter(this.namespace);
+		getOrCreateOtelSdk({
+			resource: {
+				serviceName: options?.serviceName,
+				serviceNamespace: options?.serviceNamespace,
+				serviceVersion: options?.serviceVersion,
+			},
+			defaultServiceName: this.fullId,
+		});
+		this.meter = otelMetrics.getMeter(options?.meterName ?? this.fullId);
 	}
 
 	private counterFor(name: string, unit?: MetricUnit): Counter {
 		let c = this.counters.get(name);
 		if (!c) {
-			c = this.meter.createCounter(name, { unit: toOtelUnit(unit) });
+			c = this.meter.createCounter(name, { unit: unit ?? '1' });
 			this.counters.set(name, c);
 		}
 		return c;
@@ -115,21 +100,10 @@ export class OtelMetrics extends Scope implements OtelMetricsEmitter {
 		this.counterFor(name, options?.unit).add(value, { ...this.defaultDimensions, ...options?.attributes });
 	}
 
-	/** Record multiple data points (max 100). */
-	emitBatch(metrics: MetricDatum[]): void {
-		if (metrics.length > 100) {
-			throw blocksError(OtelMetricsErrors.BatchTooLarge, `Batch exceeds 100 metrics (got ${metrics.length})`);
-		}
-		for (const m of metrics) {
-			validateMetricName(m.name);
-			this.counterFor(m.name, m.unit).add(m.value, { ...this.defaultDimensions, ...m.attributes });
-		}
-	}
-
 	/** No-op: the in-process SDK exports on its own cadence and is force-flushed by the runtime. */
 	flush(): void {}
 
-	/** Create a child emitter with merged default attributes (same namespace/meter). */
+	/** Create a child emitter with merged default attributes (same meter). */
 	child(attributes: Record<string, string>): OtelMetricsEmitter {
 		return new ChildOtelMetrics(this.meter, this.counters, { ...this.defaultDimensions, ...attributes });
 	}
@@ -176,7 +150,7 @@ class ChildOtelMetrics implements OtelMetricsEmitter {
 	private counterFor(name: string, unit?: MetricUnit): Counter {
 		let c = this.counters.get(name);
 		if (!c) {
-			c = this.meter.createCounter(name, { unit: toOtelUnit(unit) });
+			c = this.meter.createCounter(name, { unit: unit ?? '1' });
 			this.counters.set(name, c);
 		}
 		return c;
@@ -185,16 +159,6 @@ class ChildOtelMetrics implements OtelMetricsEmitter {
 	emit(name: string, value: number, options?: EmitOptions): void {
 		validateMetricName(name);
 		this.counterFor(name, options?.unit).add(value, { ...this.defaultDimensions, ...options?.attributes });
-	}
-
-	emitBatch(metrics: MetricDatum[]): void {
-		if (metrics.length > 100) {
-			throw blocksError(OtelMetricsErrors.BatchTooLarge, `Batch exceeds 100 metrics (got ${metrics.length})`);
-		}
-		for (const m of metrics) {
-			validateMetricName(m.name);
-			this.counterFor(m.name, m.unit).add(m.value, { ...this.defaultDimensions, ...m.attributes });
-		}
 	}
 
 	flush(): void {}

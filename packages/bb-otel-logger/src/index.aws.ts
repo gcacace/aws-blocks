@@ -43,7 +43,14 @@ export class OtelLogger extends Scope implements OtelChildLogger {
 		super(id, { parent: scope });
 		this.level = options?.level ?? (process.env.LOG_LEVEL as LogLevel | undefined) ?? 'info';
 		this.defaultContext = options?.defaultContext ?? {};
-		getOrCreateOtelSdk({ serviceName: this.fullId });
+		getOrCreateOtelSdk({
+			resource: {
+				serviceName: options?.serviceName,
+				serviceNamespace: options?.serviceNamespace,
+				serviceVersion: options?.serviceVersion,
+			},
+			defaultServiceName: this.fullId,
+		});
 		this.otelLogger = logs.getLogger(this.fullId);
 
 		// Publish the log group so app code / the Dashboard can locate it at runtime.

@@ -78,6 +78,19 @@ describe('resolveConfig / buildDashboardWidgets — metricsKind routing', () => 
 		assert.ok(!hasMetricGraph, 'otlp metrics must not produce a classic metric widget');
 	});
 
+	it('renders PromQL widgets for an OTLP metrics ref with NO namespace (OtelMetrics shape)', () => {
+		// Regression: OtelMetrics has no `namespace`; the metrics section must still render.
+		const options: DashboardOptions = {
+			metrics: { metricsKind: 'otlp' } as any, // no namespace, like OtelMetrics
+			metricConfigs: [{ name: 'orders.placed' }],
+		};
+		const cfg = resolveConfig('dash', options, 'fn');
+		assert.equal(cfg.metricsEnabled, true);
+		const json = buildDashboardWidgets(cfg, 'fn', 'us-east-1').flat().flatMap(w => (w as any).toJson?.() ?? []);
+		const hasPromqlChart = json.some((j: any) => j.type === 'chart' && j.properties?.data?.queries?.[0]?.language === 'PromQL');
+		assert.ok(hasPromqlChart, 'OTLP metrics without a namespace must still render PromQL widgets');
+	});
+
 	it('classic cloudwatch metrics still produce metric GraphWidgets', () => {
 		const options: DashboardOptions = {
 			metrics: { namespace: 'App/NS' },

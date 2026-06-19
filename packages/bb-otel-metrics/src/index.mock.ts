@@ -22,7 +22,6 @@ export { OtelMetricsErrors } from './errors.js';
 export type {
 	OtelMetricsOptions,
 	EmitOptions,
-	MetricDatum,
 	MetricUnit,
 	OtelMetricsEmitter,
 	Counter,
@@ -44,7 +43,14 @@ export class OtelMetrics extends AwsOtelMetrics {
 		// the first block to construct wins; subsequent ones reuse it.
 		const probe = new Scope(id, { parent: scope });
 		const tracesFile = join(getMockDataDir(probe), 'traces.json');
-		getOrCreateOtelSdk({ serviceName: options?.namespace ?? probe.fullId }, mockExporters(tracesFile));
+		getOrCreateOtelSdk({
+			resource: {
+				serviceName: options?.serviceName,
+				serviceNamespace: options?.serviceNamespace,
+				serviceVersion: options?.serviceVersion,
+			},
+			defaultServiceName: probe.fullId,
+		}, mockExporters(tracesFile));
 		super(scope, id, options);
 	}
 }

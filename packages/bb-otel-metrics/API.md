@@ -27,15 +27,7 @@ export { Histogram }
 export { Meter }
 
 // @public
-export interface MetricDatum {
-    attributes?: Record<string, string>;
-    name: string;
-    unit?: MetricUnit;
-    value: number;
-}
-
-// @public
-export type MetricUnit = 'Count' | '1' | 'Seconds' | 's' | 'Milliseconds' | 'ms' | 'Microseconds' | 'Bytes' | 'By' | 'Percent' | '%' | 'None';
+export type MetricUnit = '1' | 's' | 'ms' | 'us' | 'By' | '%' | (string & {});
 
 export { ObservableGauge }
 
@@ -46,12 +38,11 @@ export class OtelMetrics extends Scope implements OtelMetricsEmitter {
     counter(name: string, options?: MetricOptions): Counter;
     readonly defaultDimensions: Readonly<Record<string, string>>;
     emit(name: string, value: number, options?: EmitOptions): void;
-    emitBatch(metrics: MetricDatum[]): void;
     flush(): void;
     histogram(name: string, options?: MetricOptions): Histogram;
     // @internal (undocumented)
     protected log: ChildLogger;
-    readonly namespace: string;
+    readonly metricsKind: "otlp";
     observableGauge(name: string, callback: (result: {
         observe(value: number, attributes?: Record<string, string>): void;
     }) => void, options?: MetricOptions): ObservableGauge;
@@ -66,22 +57,22 @@ export interface OtelMetricsEmitter {
     // (undocumented)
     emit(name: string, value: number, options?: EmitOptions): void;
     // (undocumented)
-    emitBatch(metrics: MetricDatum[]): void;
-    // (undocumented)
     flush(): void;
 }
 
 // @public
 export const OtelMetricsErrors: {
     readonly InvalidMetricName: "InvalidMetricNameException";
-    readonly BatchTooLarge: "BatchTooLargeException";
 };
 
 // @public
 export interface OtelMetricsOptions {
     defaultAttributes?: Record<string, string>;
     logger?: ChildLogger;
-    namespace?: string;
+    meterName?: string;
+    serviceName?: string;
+    serviceNamespace?: string;
+    serviceVersion?: string;
 }
 
 export { UpDownCounter }

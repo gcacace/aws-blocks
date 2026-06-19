@@ -45,6 +45,15 @@ export interface StartSegmentOptions {
 export interface OtelTracerOptions {
 	/** Enable or disable tracing. Default: `true`. When `false`, `startSegment` still runs `fn`. */
 	enabled?: boolean;
+	/**
+	 * `service.name` resource attribute (OTel semconv). Set once per process via the SDK
+	 * Resource. Defaults to `BLOCKS_STACK_NAME`, then the block's scope `fullId`.
+	 */
+	serviceName?: string;
+	/** `service.namespace` resource attribute — a grouping for related services. */
+	serviceNamespace?: string;
+	/** `service.version` resource attribute. */
+	serviceVersion?: string;
 }
 
 // Re-export OTel handle types for the escape-hatch surface.

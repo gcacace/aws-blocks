@@ -15,10 +15,18 @@
  */
 
 import { trace, metrics, context, propagation } from '@opentelemetry/api';
+import type { MeterProvider as ApiMeterProvider, TracerProvider as ApiTracerProvider } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
+import type { LoggerProvider as ApiLoggerProvider } from '@opentelemetry/api-logs';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
-import { resourceFromAttributes } from '@opentelemetry/resources';
+import { resourceFromAttributes, detectResources, envDetector } from '@opentelemetry/resources';
+import { awsLambdaDetector } from '@opentelemetry/resource-detector-aws';
+import {
+	ATTR_SERVICE_NAME,
+	ATTR_SERVICE_NAMESPACE,
+	ATTR_SERVICE_VERSION,
+} from '@opentelemetry/semantic-conventions';
 import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import type { SpanExporter } from '@opentelemetry/sdk-trace-base';
 import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
@@ -28,7 +36,7 @@ import type { LogRecordExporter } from '@opentelemetry/sdk-logs';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
-import type { OtelSdkOptions } from './types.js';
+import type { OtelSdkOptions, OtelResourceOptions } from './types.js';
 
 const DEFAULT_COLLECTOR_URL = 'http://localhost:4318';
 const SDK_KEY = '__BLOCKS_OTEL_SDK__';
@@ -58,10 +66,42 @@ function defaultExporters(collectorUrl: string): OtelExporters {
 }
 
 /**
+ * Build the SDK Resource from semantic-convention service identity, then merge
+ * detected attributes. `service.name` resolves to (in order): an explicit
+ * `resource.serviceName`, the `BLOCKS_STACK_NAME` env var, or `defaultServiceName`.
+ *
+ * Detection adds AWS Lambda attributes (`faas.*`, `cloud.*`, `aws.log.group.names`)
+ * out of the box — the OTel-recommended path, since the collector layer omits the
+ * resourcedetection processor (see contrib#17584). `envDetector` runs last so
+ * `OTEL_RESOURCE_ATTRIBUTES` can override at deploy time.
+ */
+function buildResource(options: OtelSdkOptions) {
+	const r: OtelResourceOptions = options.resource ?? {};
+	const serviceName = r.serviceName
+		?? process.env.BLOCKS_STACK_NAME
+		?? options.defaultServiceName
+		?? 'aws-blocks-service';
+
+	const base = resourceFromAttributes({
+		[ATTR_SERVICE_NAME]: serviceName,
+		...(r.serviceNamespace ? { [ATTR_SERVICE_NAMESPACE]: r.serviceNamespace } : {}),
+		...(r.serviceVersion ? { [ATTR_SERVICE_VERSION]: r.serviceVersion } : {}),
+		...(r.attributes ?? {}),
+	});
+
+	// `Resource.merge(other)` lets `other` win on key conflict. Merging detected INTO
+	// base means: Lambda attrs (faas.*/cloud.*, no overlap) are added, and anything in
+	// OTEL_RESOURCE_ATTRIBUTES (envDetector) intentionally overrides — the deploy-time
+	// ops escape hatch. The base service.* attrs are untouched unless ops override them.
+	const detected = detectResources({ detectors: [awsLambdaDetector, envDetector] });
+	return base.merge(detected);
+}
+
+/**
  * Initialize the global OTel providers exactly once per process, returning the
  * existing instance on subsequent calls.
  *
- * @param options - service name + optional collector URL.
+ * @param options - service identity (resource attributes) + optional collector URL.
  * @param exporters - exporter factory override (used by the mock runtime).
  */
 export function getOrCreateOtelSdk(options: OtelSdkOptions, exporters?: OtelExporters): OtelSdk {
@@ -70,7 +110,7 @@ export function getOrCreateOtelSdk(options: OtelSdkOptions, exporters?: OtelExpo
 
 	const collectorUrl = options.collectorUrl ?? DEFAULT_COLLECTOR_URL;
 	const exp = exporters ?? defaultExporters(collectorUrl);
-	const resource = resourceFromAttributes({ 'service.name': options.serviceName });
+	const resource = buildResource(options);
 
 	// Register a context manager + W3C propagator so active-span reads
 	// (trace.getActiveSpan, propagation.inject/extract) work. BasicTracerProvider
@@ -138,4 +178,33 @@ export async function flushOtel(): Promise<void> {
 	const results = await Promise.allSettled(Array.from(flushers).map(fn => fn()));
 	// Swallow individual flush errors; telemetry loss must not fail the request.
 	void results;
+}
+
+// ── Provider accessors (escape hatch for OTel-compatible libraries) ──────────
+//
+// Hand these to a third-party library so it records into the same pipeline:
+//   someLib.init({ meterProvider: getOtelMeterProvider() });
+// then the library names its own meter: meterProvider.getMeter('their-lib', '1.0').
+//
+// They return the in-process provider an OTel block initialized; if no block has run
+// yet they fall back to the `@opentelemetry/api` global provider (which the SDK also
+// registers via setGlobal*Provider), so a library using the API's global getMeter()
+// works without any wiring. Zero-arg and never throw.
+
+/** The active `MeterProvider` (initialized SDK, else the API global). */
+export function getOtelMeterProvider(): ApiMeterProvider {
+	const sdk = (globalThis as any)[SDK_KEY] as OtelSdk | undefined;
+	return sdk?.meterProvider ?? metrics.getMeterProvider();
+}
+
+/** The active `TracerProvider` (initialized SDK, else the API global). */
+export function getOtelTracerProvider(): ApiTracerProvider {
+	const sdk = (globalThis as any)[SDK_KEY] as OtelSdk | undefined;
+	return sdk?.tracerProvider ?? trace.getTracerProvider();
+}
+
+/** The active `LoggerProvider` (initialized SDK, else the Logs-API global). */
+export function getOtelLoggerProvider(): ApiLoggerProvider {
+	const sdk = (globalThis as any)[SDK_KEY] as OtelSdk | undefined;
+	return sdk?.loggerProvider ?? logs.getLoggerProvider();
 }

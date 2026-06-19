@@ -6,13 +6,12 @@
 // returns inert instrument handles, so bundlers don't pull the OTel SDK into the
 // browser bundle.
 
-import type { EmitOptions, MetricDatum, OtelMetricsEmitter } from './types.js';
+import type { EmitOptions, OtelMetricsEmitter } from './types.js';
 
 export { OtelMetricsErrors } from './errors.js';
 export type {
 	OtelMetricsOptions,
 	EmitOptions,
-	MetricDatum,
 	MetricUnit,
 	OtelMetricsEmitter,
 	Counter,
@@ -30,11 +29,10 @@ const NOOP_INSTRUMENT: any = {
 };
 
 export class OtelMetrics implements OtelMetricsEmitter {
-	readonly namespace = '';
 	readonly defaultDimensions: Readonly<Record<string, string>> = {};
+	readonly metricsKind = 'otlp' as const;
 	constructor(..._args: any[]) {}
 	emit(_name: string, _value: number, _options?: EmitOptions): void {}
-	emitBatch(_metrics: MetricDatum[]): void {}
 	flush(): void {}
 	child(_attributes: Record<string, string>): OtelMetricsEmitter { return new OtelMetrics(); }
 	counter(): any { return NOOP_INSTRUMENT; }

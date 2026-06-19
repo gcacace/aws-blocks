@@ -18,8 +18,17 @@ OTel's typed instruments, span links/events, context propagation, and the raw
 
 - New `@aws-blocks/otel-common` support package (in-process SDK bootstrap + flush,
   collector-config renderer, and the idempotent CDK infra helper).
+- Telemetry follows OpenTelemetry semantic conventions: service identity is configured
+  via `serviceName`/`serviceNamespace`/`serviceVersion` resource attributes (no
+  "namespace"), and AWS Lambda resource attributes (`faas.*`, `cloud.*`,
+  `aws.log.group.names`) are auto-detected in-process and queryable as `@resource.*`
+  PromQL labels. `service.name` defaults to `BLOCKS_STACK_NAME`.
+- `OtelMetrics` exposes `emit` + typed OTel instruments; metric `unit` values are UCUM.
+  (There is no `emitBatch`/`MetricDatum` — OTel batches at export, not at the API.)
+- Provider escape hatch for OTel-compatible libraries: `getOtelMeterProvider()`,
+  `getOtelTracerProvider()`, `getOtelLoggerProvider()` (plus the registered global providers).
 - `@aws-blocks/bb-dashboard` gains PromQL `chart` widgets so OTLP metrics (which are
-  PromQL-queryable, not classic namespace/dimension metrics) render correctly; classic
-  `Metrics` dashboards are unaffected.
+  PromQL-queryable, with no namespace) render correctly; classic `Metrics` dashboards are
+  unaffected. `MetricsBBRef.namespace` is now optional.
 - `@aws-blocks/core` flushes in-process OpenTelemetry telemetry after each invocation
   (no-op unless an OTel block is in use).

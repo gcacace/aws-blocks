@@ -463,13 +463,15 @@ export function buildDashboardWidgets(config: ResolvedDashboardConfig, functionN
 	rows.push(...buildLambdaWidgets(functionName, region));
 
 	// Metrics section
-	if (config.metricsNamespace) {
+	if (config.metricsEnabled) {
 		rows.push(sectionHeader('## 📊 Metrics'));
 		if (config.metricsKind === 'otlp') {
-			// OTLP metrics are PromQL-queryable (no namespace) → PromQL chart widgets.
+			// OTLP metrics are PromQL-queryable (no namespace) → PromQL chart widgets,
+			// selected by metric name (+ optional @resource.* / attribute label filters).
 			rows.push(...buildPromqlMetricsWidgets(config.metricConfigs, region, config.metricsDefaultDimensions));
 		} else {
-			rows.push(...buildMetricsWidgets(config.metricsNamespace, config.metricConfigs, region, config.metricsDefaultDimensions));
+			// Classic CloudWatch metrics require a namespace (falls back to a placeholder).
+			rows.push(...buildMetricsWidgets(config.metricsNamespace ?? 'Custom', config.metricConfigs, region, config.metricsDefaultDimensions));
 		}
 	}
 
@@ -503,7 +505,11 @@ export function buildDashboardWidgets(config: ResolvedDashboardConfig, functionN
  *   default dashboardName to ensure uniqueness across environments/deployments.
  */
 export function resolveConfig(id: string, options?: DashboardOptions, functionName?: string, scopeFullId?: string): ResolvedDashboardConfig {
-	const metricsNamespace = options?.metrics ? options.metrics.namespace : undefined;
+	// A metrics section renders whenever a Metrics ref is provided. Classic (EMF)
+	// metrics carry a `namespace`; OTLP metrics (OtelMetrics) do not — they're selected
+	// by metric name via PromQL — so the section must NOT be gated on the namespace.
+	const metricsEnabled = options?.metrics !== undefined;
+	const metricsNamespace = options?.metrics?.namespace;
 
 	const metricsDefaultDimensions = options?.metrics?.defaultDimensions
 		&& Object.keys(options.metrics.defaultDimensions).length > 0
@@ -519,6 +525,7 @@ export function resolveConfig(id: string, options?: DashboardOptions, functionNa
 	return {
 		title: options?.title ?? id,
 		dashboardName: (options?.dashboardName ?? scopeFullId ?? id).replace(/[^A-Za-z0-9\-_]/g, '-').substring(0, 255),
+		metricsEnabled,
 		metricsNamespace,
 		metricsDefaultDimensions,
 		metricsKind: options?.metrics?.metricsKind ?? 'cloudwatch',

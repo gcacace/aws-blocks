@@ -20,6 +20,15 @@ export interface OtelLoggingOptions {
 	level?: LogLevel;
 	/** Attributes included on every log record from this logger. */
 	defaultContext?: Record<string, unknown>;
+	/**
+	 * `service.name` resource attribute (OTel semconv). Set once per process via the SDK
+	 * Resource. Defaults to `BLOCKS_STACK_NAME`, then the block's scope `fullId`.
+	 */
+	serviceName?: string;
+	/** `service.namespace` resource attribute — a grouping for related services. */
+	serviceNamespace?: string;
+	/** `service.version` resource attribute. */
+	serviceVersion?: string;
 }
 
 /**

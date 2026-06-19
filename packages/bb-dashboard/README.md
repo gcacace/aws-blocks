@@ -40,7 +40,7 @@ import { OtelLogger } from '@aws-blocks/bb-otel-logger';
 import { OtelTracer } from '@aws-blocks/bb-otel-tracer';
 
 const logger = new OtelLogger(scope, 'logs');
-const metrics = new OtelMetrics(scope, 'metrics', { namespace: 'MyApp' });
+const metrics = new OtelMetrics(scope, 'metrics', { serviceName: 'MyApp' });
 const tracer = new OtelTracer(scope, 'tracing');
 
 const dashboard = new Dashboard(scope, 'dashboard', {

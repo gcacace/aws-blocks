@@ -5,7 +5,6 @@ export { OtelMetrics, OtelMetricsErrors } from './index.aws.js';
 export type {
 	OtelMetricsOptions,
 	EmitOptions,
-	MetricDatum,
 	MetricUnit,
 	OtelMetricsEmitter,
 	Counter,

@@ -75,7 +75,16 @@ export class OtelTracer extends Scope {
 	constructor(scope: ScopeParent, id: string, options?: OtelTracerOptions) {
 		super(id, { parent: scope });
 		this.enabled = options?.enabled !== false;
-		if (this.enabled) getOrCreateOtelSdk({ serviceName: this.fullId });
+		if (this.enabled) {
+			getOrCreateOtelSdk({
+				resource: {
+					serviceName: options?.serviceName,
+					serviceNamespace: options?.serviceNamespace,
+					serviceVersion: options?.serviceVersion,
+				},
+				defaultServiceName: this.fullId,
+			});
+		}
 		this.tracer = trace.getTracer(this.fullId);
 	}
 

@@ -40,6 +40,17 @@ The `segment` passed to the callback offers `addAnnotation` (searchable),
 `setHttpStatus`. X-Ray indexing of attributes is governed by X-Ray **indexing rules**,
 not by the annotation/metadata distinction.
 
+### Options
+
+- `enabled` — disable tracing (`startSegment` still runs the wrapped fn). Default `true`.
+- `serviceName` / `serviceNamespace` / `serviceVersion` — OTel `service.*` resource
+  attributes (semconv), set once per process. `serviceName` defaults to `BLOCKS_STACK_NAME`,
+  then the block's scope `fullId`.
+
+Spans carry the SDK's **resource attributes** — your `service.*` identity plus auto-detected
+AWS Lambda attributes (`faas.*`, `cloud.*`). The raw `Tracer`/provider escape hatch is
+available via `rawTracer` and `getOtelTracerProvider()` (from `@aws-blocks/otel-common`).
+
 ## Prerequisite & local dev
 
 CloudWatch **Transaction Search** must be enabled (account/region) for OTLP spans to be

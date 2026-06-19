@@ -11,7 +11,6 @@ export { OtelMetricsErrors } from './errors.js';
 export type {
 	OtelMetricsOptions,
 	EmitOptions,
-	MetricDatum,
 	MetricUnit,
 	OtelMetricsEmitter,
 	Counter,
@@ -24,18 +23,16 @@ export type {
 /**
  * CDK construct for OTel Metrics. Attaches the shared OTel collector infrastructure
  * to the Blocks handler (once per stack) and grants the metrics IAM
- * (`cloudwatch:PutMetricData`). Exposes `namespace`/`defaultDimensions` so the
+ * (`cloudwatch:PutMetricData`). Exposes `defaultDimensions` + `metricsKind` so the
  * Dashboard block can build PromQL widgets for this Metrics instance.
  */
 export class OtelMetrics extends Scope {
-	readonly namespace: string;
 	readonly defaultDimensions: Readonly<Record<string, string>>;
 	/** Marks these metrics as OTLP/PromQL so the Dashboard renders PromQL widgets. */
 	readonly metricsKind = 'otlp' as const;
 
 	constructor(scope: ScopeParent, id: string, options?: OtelMetricsOptions) {
 		super(id, { parent: scope });
-		this.namespace = options?.namespace ?? this.fullId;
 		this.defaultDimensions = options?.defaultAttributes ?? {};
 		getOrCreateOtelSharedInfra(cdk.Stack.of(this), this.handler, this, {
 			signals: { metrics: true },

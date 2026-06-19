@@ -51,8 +51,7 @@ export interface MetricConfig {
 export interface MetricsBBRef {
     readonly defaultDimensions?: Record<string, string>;
     readonly metricsKind?: 'cloudwatch' | 'otlp';
-    // (undocumented)
-    readonly namespace: string;
+    readonly namespace?: string;
 }
 
 // @public

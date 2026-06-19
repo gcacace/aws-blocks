@@ -75,12 +75,36 @@ export interface CollectorConfigInput {
 }
 
 /**
+ * Service identity for the OTel SDK `Resource`, following the OpenTelemetry
+ * {@link https://opentelemetry.io/docs/specs/semconv/resource/service/ service semantic conventions}.
+ * Set once per process (the SDK Resource is a process-wide singleton).
+ */
+export interface OtelResourceOptions {
+	/**
+	 * `service.name` — the logical service name. Defaults to the `BLOCKS_STACK_NAME`
+	 * env var, falling back to the constructing block's scope `fullId`.
+	 */
+	serviceName?: string;
+	/** `service.namespace` — a grouping for related services (e.g. team or system). */
+	serviceNamespace?: string;
+	/** `service.version` — the service version string. */
+	serviceVersion?: string;
+	/** Additional resource attributes merged onto the base service identity. */
+	attributes?: Record<string, string | number | boolean>;
+}
+
+/**
  * Options for the in-process OTel SDK (`getOrCreateOtelSdk`). The defaults target
  * the local collector; the mock runtime overrides the exporter destination.
  */
 export interface OtelSdkOptions {
-	/** `service.name` resource attribute. */
-	serviceName: string;
+	/** Service identity (semconv resource attributes). */
+	resource?: OtelResourceOptions;
+	/**
+	 * Fallback `service.name` when `resource.serviceName` and `BLOCKS_STACK_NAME` are
+	 * both unset — typically the constructing block's scope `fullId`.
+	 */
+	defaultServiceName?: string;
 	/** Collector OTLP/HTTP base URL. Defaults to `http://localhost:4318`. */
 	collectorUrl?: string;
 }

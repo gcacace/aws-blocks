@@ -7,11 +7,14 @@
 import { BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
 import type { ExportResult } from '@opentelemetry/core';
 import { LoggerProvider } from '@opentelemetry/sdk-logs';
+import type { LoggerProvider as LoggerProvider_2 } from '@opentelemetry/api-logs';
 import type { LogRecordExporter } from '@opentelemetry/sdk-logs';
 import { MeterProvider } from '@opentelemetry/sdk-metrics';
+import type { MeterProvider as MeterProvider_2 } from '@opentelemetry/api';
 import type { PushMetricExporter } from '@opentelemetry/sdk-metrics';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import type { SpanExporter } from '@opentelemetry/sdk-trace-base';
+import type { TracerProvider } from '@opentelemetry/api';
 
 // @public
 export const COLLECTOR_LAYER_ACCOUNT = "184161586896";
@@ -54,6 +57,15 @@ export function flushOtel(): Promise<void>;
 export function getOrCreateOtelSdk(options: OtelSdkOptions, exporters?: OtelExporters): OtelSdk;
 
 // @public
+export function getOtelLoggerProvider(): LoggerProvider_2;
+
+// @public
+export function getOtelMeterProvider(): MeterProvider_2;
+
+// @public
+export function getOtelTracerProvider(): TracerProvider;
+
+// @public
 export function mockExporters(tracesFilePath: string): OtelExporters;
 
 // @public
@@ -73,6 +85,14 @@ export interface OtelExporters {
 }
 
 // @public
+export interface OtelResourceOptions {
+    attributes?: Record<string, string | number | boolean>;
+    serviceName?: string;
+    serviceNamespace?: string;
+    serviceVersion?: string;
+}
+
+// @public
 export interface OtelSdk {
     // (undocumented)
     loggerProvider: LoggerProvider;
@@ -85,7 +105,8 @@ export interface OtelSdk {
 // @public
 export interface OtelSdkOptions {
     collectorUrl?: string;
-    serviceName: string;
+    defaultServiceName?: string;
+    resource?: OtelResourceOptions;
 }
 
 // @public

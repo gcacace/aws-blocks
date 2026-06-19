@@ -21,6 +21,4 @@
 export const OtelMetricsErrors = {
 	/** Metric name is empty or exceeds 255 characters (OTel instrument-name limit). */
 	InvalidMetricName: 'InvalidMetricNameException',
-	/** Batch contains more than 100 metrics. */
-	BatchTooLarge: 'BatchTooLargeException',
 } as const;

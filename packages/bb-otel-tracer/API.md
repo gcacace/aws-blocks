@@ -34,6 +34,9 @@ export class OtelTracer extends Scope {
 // @public
 export interface OtelTracerOptions {
     enabled?: boolean;
+    serviceName?: string;
+    serviceNamespace?: string;
+    serviceVersion?: string;
 }
 
 // @public

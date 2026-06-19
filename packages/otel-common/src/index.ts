@@ -10,7 +10,14 @@
  * lives in the `./cdk` subpath (it imports `aws-cdk-lib`).
  */
 
-export { getOrCreateOtelSdk, registerOtelFlusher, flushOtel } from './sdk.js';
+export {
+	getOrCreateOtelSdk,
+	registerOtelFlusher,
+	flushOtel,
+	getOtelMeterProvider,
+	getOtelTracerProvider,
+	getOtelLoggerProvider,
+} from './sdk.js';
 export type { OtelExporters, OtelSdk } from './sdk.js';
 export { mockExporters, FileSpanExporter } from './mock.js';
 export { renderCollectorConfig } from './collector-config.js';
@@ -26,4 +33,5 @@ export type {
 	OtelSharedInfraOptions,
 	CollectorConfigInput,
 	OtelSdkOptions,
+	OtelResourceOptions,
 } from './types.js';

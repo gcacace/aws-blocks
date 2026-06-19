@@ -52,6 +52,9 @@ export const OtelLoggingErrors: {
 export interface OtelLoggingOptions {
     defaultContext?: Record<string, unknown>;
     level?: LogLevel;
+    serviceName?: string;
+    serviceNamespace?: string;
+    serviceVersion?: string;
 }
 
 // (No @packageDocumentation comment for this package)
